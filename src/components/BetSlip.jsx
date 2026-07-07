@@ -126,6 +126,10 @@ export default function BetSlip({ market, poolYes, poolNo, balance, initialSide,
               <span className="v tnum">{priceLabel(preview.avgPrice)}</span>
             </div>
             <div className="slip-row">
+              <span className="k">Margin <span className="faint">(2%)</span></span>
+              <span className="v tnum faint">−{money(preview.fee)}</span>
+            </div>
+            <div className="slip-row">
               <span className="k">Payout if {side}</span>
               <span className="v tnum big green">{money(preview.payout)}</span>
             </div>

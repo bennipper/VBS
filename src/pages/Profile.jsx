@@ -5,6 +5,14 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { money, signedMoney, priceLabel, relTime } from '../lib/format.js'
 import { BAILOUT_THRESHOLD, BAILOUT_AMOUNT, AVATAR_BUCKET, AVATAR_MAX_BYTES } from '../config.js'
 import Avatar from '../components/Avatar.jsx'
+import { computeAchievements } from '../lib/achievements.js'
+
+// Net P/L from the ledger — includes payouts, refunds, cash-outs and rake, minus
+// stakes. Excludes bailouts and the signup bonus (those aren't winnings).
+const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake'])
+function plFromTransactions(txns) {
+  return txns.reduce((acc, t) => (PL_TYPES.has(t.type) ? acc + Number(t.amount) : acc), 0)
+}
 
 function computeStats(bets) {
   let staked = 0
@@ -46,6 +54,8 @@ export default function Profile() {
 
   const [profile, setProfile] = useState(null)
   const [bets, setBets] = useState([])
+  const [txns, setTxns] = useState([])
+  const [marketsCreated, setMarketsCreated] = useState(0)
   const [loading, setLoading] = useState(true)
   const [bailoutBusy, setBailoutBusy] = useState(false)
   const [bailoutError, setBailoutError] = useState('')
@@ -54,16 +64,20 @@ export default function Profile() {
   const [uploadErr, setUploadErr] = useState('')
 
   const load = useCallback(async () => {
-    const [{ data: p }, { data: b }] = await Promise.all([
+    const [{ data: p }, { data: b }, { data: tx }, { count }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', targetId).maybeSingle(),
       supabase
         .from('bets')
         .select('*, market:markets!market_id(question, resolved_outcome, resolved_at)')
         .eq('user_id', targetId)
         .order('created_at', { ascending: false }),
+      supabase.from('transactions').select('type, amount, created_at').eq('user_id', targetId),
+      supabase.from('markets').select('id', { count: 'exact', head: true }).eq('creator_id', targetId),
     ])
     setProfile(p ?? null)
     setBets(b ?? [])
+    setTxns(tx ?? [])
+    setMarketsCreated(count ?? 0)
     setLoading(false)
   }, [targetId])
 
@@ -139,6 +153,9 @@ export default function Profile() {
   }
 
   const stats = computeStats(bets)
+  const pl = plFromTransactions(txns)
+  const rakeEarned = txns.reduce((a, t) => (t.type === 'rake' ? a + Number(t.amount) : a), 0)
+  const achievements = computeAchievements({ bets, profile: shownProfile, marketsCreated, rakeEarned })
   const balance = Number(shownProfile.balance)
   const canBailout = isMe && balance < BAILOUT_THRESHOLD
 
@@ -219,8 +236,8 @@ export default function Profile() {
       <div className="statgrid">
         <div className="stat">
           <div className="k">Net P/L</div>
-          <div className={`v tnum ${stats.pl > 0 ? 'green' : stats.pl < 0 ? 'red' : ''}`}>
-            {signedMoney(stats.pl)}
+          <div className={`v tnum ${pl > 0 ? 'green' : pl < 0 ? 'red' : ''}`}>
+            {signedMoney(pl)}
           </div>
         </div>
         <div className="stat">
@@ -237,6 +254,25 @@ export default function Profile() {
           <div className="k">Bailouts</div>
           <div className="v tnum">{shownProfile.bailout_count}</div>
         </div>
+      </div>
+
+      {/* Achievements */}
+      <div className="section-head">
+        <h2>Badges</h2>
+        <span className="faint" style={{ fontSize: 12 }}>
+          {achievements.filter((a) => a.earned).length}/{achievements.length}
+        </span>
+      </div>
+      <div className="badge-grid">
+        {achievements.map((a) => (
+          <div key={a.name} className={`ach${a.earned ? ' earned' : ''}`} title={a.desc}>
+            <span className="ach-emoji">{a.emoji}</span>
+            <div className="ach-txt">
+              <div className="ach-name">{a.name}</div>
+              <div className="ach-desc">{a.desc}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Bet history */}

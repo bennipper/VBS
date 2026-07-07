@@ -17,6 +17,10 @@ export const SEED_LIQUIDITY = 300
 // Quick-bet chips on the bet slip.
 export const QUICK_CHIPS = [10, 50, 100]
 
+// Bookie margin (vig) taken off every stake. Half goes to the market creator,
+// half is burned as a money sink. Keep in sync with place_bet in schema.sql.
+export const BET_VIG = 0.02
+
 // Avatar emoji options for the picker.
 export const AVATAR_EMOJIS = [
   '🎲', '🎰', '🃏', '💸', '🍺', '🐎', '🦆', '🔥',

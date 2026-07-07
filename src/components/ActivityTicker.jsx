@@ -15,6 +15,13 @@ function itemNode(a) {
       </>
     )
   }
+  if (a.kind === 'cashout') {
+    return (
+      <>
+        💰 <b>{a.actor_username}</b> cashed out {money(a.amount, { compact: true })}
+      </>
+    )
+  }
   if (a.kind === 'result') {
     const cls = a.outcome === 'YES' ? 'tk-yes' : a.outcome === 'NO' ? 'tk-no' : 'tk-void'
     return (

@@ -461,6 +461,25 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .tk-void { color: var(--paper-dim); font-weight: 700; }
 @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
+/* Achievements */
+.badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ach { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); opacity: 0.45; filter: grayscale(1); }
+.ach.earned { opacity: 1; filter: none; border-color: color-mix(in srgb, var(--gold) 40%, var(--line-2)); background: color-mix(in srgb, var(--gold) 7%, var(--card)); }
+.ach-emoji { font-size: 22px; line-height: 1; }
+.ach-name { font-size: 13px; font-weight: 700; }
+.ach-desc { font-size: 11px; color: var(--paper-faint); line-height: 1.25; margin-top: 1px; }
+
+/* Punter of the month banner */
+.champ-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 13px; margin-bottom: 12px;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line-2));
+  background: color-mix(in srgb, var(--gold) 8%, var(--card));
+  border-radius: var(--radius-sm); font-size: 13.5px;
+}
+.champ-trophy { font-size: 20px; }
+.champ-name { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
+
 /* Avatar upload */
 .avatar-upload { display: flex; align-items: center; gap: 14px; }
 .avatar-upload .current { position: relative; }

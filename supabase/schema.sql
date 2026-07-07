@@ -459,9 +459,9 @@ insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
+-- No SELECT policy: the bucket is public, so <img> URLs (/object/public/...)
+-- work without one. Omitting it prevents clients from LISTING every avatar file.
 drop policy if exists "avatars read" on storage.objects;
-create policy "avatars read" on storage.objects
-  for select using (bucket_id = 'avatars');
 
 drop policy if exists "avatars insert own" on storage.objects;
 create policy "avatars insert own" on storage.objects
@@ -566,3 +566,246 @@ begin
     execute 'alter publication supabase_realtime add table public.bet_reactions';
   end if;
 end $$;
+
+
+-- ============================================================================
+-- V2 · Phase 2 — cash-out (sell shares) + 2% creator rake (with burned sink).
+-- (Applied live as migrations vbs_v2_phase2_cashout_rake + vbs_v2_activity_add_cashout.)
+-- These CREATE OR REPLACE the v1 place_bet / resolve_market above; on a fresh run
+-- the later definitions win, leaving the DB in the correct final state.
+-- ============================================================================
+
+-- Track unsold shares for correct cash-out + resolution payout.
+alter table public.bets add column if not exists shares_open numeric;
+update public.bets set shares_open = shares where shares_open is null;
+alter table public.bets alter column shares_open set not null;
+alter table public.bets alter column shares_open set default 0;
+
+-- New ledger types.
+alter table public.transactions drop constraint if exists transactions_type_check;
+alter table public.transactions add constraint transactions_type_check
+  check (type in ('bet','payout','refund','bailout','signup_bonus','cashout','rake'));
+
+-- place_bet v2 — 2% margin: half to the creator, half burned; sets shares_open.
+create or replace function public.place_bet(
+  p_market_id uuid, p_side text, p_amount numeric
+)
+returns table (shares numeric, price_avg numeric, prob_after numeric, new_balance numeric)
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_vig constant numeric := 0.02;
+  v_creator_share constant numeric := 0.5;
+  v_user uuid := auth.uid();
+  v_bal numeric; v_creator uuid;
+  y numeric; n numeric; k numeric;
+  m numeric := p_amount;
+  v_fee numeric; v_creator_cut numeric; v_eff numeric;
+  y_prime numeric; n_prime numeric; s numeric;
+  new_yes numeric; new_no numeric; v_prob numeric; v_price numeric;
+  m_closes timestamptz; m_resolved timestamptz;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  if p_side not in ('YES','NO') then raise exception 'side must be YES or NO'; end if;
+  if m is null or m <= 0 then raise exception 'amount must be positive'; end if;
+
+  select balance into v_bal from public.profiles where id = v_user for update;
+  if v_bal is null then raise exception 'profile not found'; end if;
+  if v_bal < m then raise exception 'insufficient balance'; end if;
+
+  select pool_yes, pool_no, closes_at, resolved_at, creator_id
+    into y, n, m_closes, m_resolved, v_creator
+    from public.markets where id = p_market_id for update;
+  if y is null then raise exception 'market not found'; end if;
+  if m_resolved is not null then raise exception 'market already resolved'; end if;
+  if m_closes is not null and m_closes <= now() then raise exception 'market is closed for betting'; end if;
+
+  v_fee := m * v_vig;
+  v_creator_cut := v_fee * v_creator_share;
+  v_eff := m - v_fee;
+
+  k := y * n;
+  y_prime := y + v_eff;
+  n_prime := n + v_eff;
+  if p_side = 'YES' then
+    s := y_prime - k / n_prime; new_yes := y_prime - s; new_no := n_prime;
+  else
+    s := n_prime - k / y_prime; new_no := n_prime - s; new_yes := y_prime;
+  end if;
+
+  v_price := m / s;
+  v_prob := new_no / (new_yes + new_no);
+
+  update public.profiles set balance = balance - m where id = v_user;
+  update public.markets set pool_yes = new_yes, pool_no = new_no where id = p_market_id;
+
+  if v_creator_cut > 0 then
+    update public.profiles set balance = balance + v_creator_cut where id = v_creator;
+    insert into public.transactions (user_id, type, amount, market_id)
+    values (v_creator, 'rake', v_creator_cut, p_market_id);
+  end if;
+
+  insert into public.bets (market_id, user_id, side, amount, shares, shares_open, price_avg, prob_after)
+  values (p_market_id, v_user, p_side, m, s, s, v_price, v_prob);
+  insert into public.transactions (user_id, type, amount, market_id)
+  values (v_user, 'bet', -m, p_market_id);
+
+  return query select s, v_price, v_prob,
+    (v_bal - m + case when v_creator = v_user then v_creator_cut else 0 end);
+end;
+$$;
+
+-- sell_position — cash out shares back to the pool (CPMM sell = buy inverted).
+create or replace function public.sell_position(
+  p_market_id uuid, p_side text, p_shares numeric
+)
+returns table (cashed_out numeric, prob_after numeric, new_balance numeric)
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_bal numeric; y numeric; n numeric; k numeric; v_resolved timestamptz;
+  v_open numeric; v_sell numeric; v_remaining numeric;
+  a numeric; disc numeric; m_out numeric;
+  new_yes numeric; new_no numeric; v_prob numeric; r record;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  if p_side not in ('YES','NO') then raise exception 'side must be YES or NO'; end if;
+
+  select balance into v_bal from public.profiles where id = v_user for update;
+  select pool_yes, pool_no, resolved_at into y, n, v_resolved
+    from public.markets where id = p_market_id for update;
+  if y is null then raise exception 'market not found'; end if;
+  if v_resolved is not null then raise exception 'market already resolved'; end if;
+
+  select coalesce(sum(shares_open), 0) into v_open
+    from public.bets where market_id = p_market_id and user_id = v_user and side = p_side;
+  if v_open <= 0 then raise exception 'no % position to cash out', p_side; end if;
+
+  v_sell := least(coalesce(p_shares, v_open), v_open);
+  if v_sell <= 0 then raise exception 'nothing to cash out'; end if;
+
+  k := y * n;
+  if p_side = 'YES' then
+    a := y + v_sell;
+    disc := (a + n) * (a + n) - 4 * (a * n - k);
+    m_out := ((a + n) - sqrt(disc)) / 2;
+    new_yes := y + v_sell - m_out; new_no := n - m_out;
+  else
+    a := n + v_sell;
+    disc := (a + y) * (a + y) - 4 * (a * y - k);
+    m_out := ((a + y) - sqrt(disc)) / 2;
+    new_no := n + v_sell - m_out; new_yes := y - m_out;
+  end if;
+  if m_out <= 0 then raise exception 'cash-out produced no proceeds'; end if;
+
+  update public.markets set pool_yes = new_yes, pool_no = new_no where id = p_market_id;
+  update public.profiles set balance = balance + m_out where id = v_user;
+
+  v_remaining := v_sell;
+  for r in
+    select id, shares_open from public.bets
+    where market_id = p_market_id and user_id = v_user and side = p_side and shares_open > 0
+    order by created_at
+  loop
+    exit when v_remaining <= 0;
+    if r.shares_open <= v_remaining then
+      update public.bets set shares_open = 0 where id = r.id;
+      v_remaining := v_remaining - r.shares_open;
+    else
+      update public.bets set shares_open = shares_open - v_remaining where id = r.id;
+      v_remaining := 0;
+    end if;
+  end loop;
+
+  v_prob := new_no / (new_yes + new_no);
+  insert into public.transactions (user_id, type, amount, market_id)
+  values (v_user, 'cashout', m_out, p_market_id);
+
+  return query select m_out, v_prob, (v_bal + m_out);
+end;
+$$;
+
+-- resolve_market v2 — pays shares_open; VOID refunds only the unsold portion.
+create or replace function public.resolve_market(
+  p_market_id uuid, p_outcome text
+)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_creator uuid; v_resolved timestamptz; r record; v_refund numeric;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  if p_outcome not in ('YES','NO','VOID') then raise exception 'outcome must be YES, NO or VOID'; end if;
+
+  select creator_id, resolved_at into v_creator, v_resolved
+    from public.markets where id = p_market_id for update;
+  if v_creator is null then raise exception 'market not found'; end if;
+  if v_creator <> v_user then raise exception 'only the creator can resolve this market'; end if;
+  if v_resolved is not null then raise exception 'market already resolved'; end if;
+
+  if p_outcome = 'VOID' then
+    for r in select id, user_id, amount, shares, shares_open from public.bets where market_id = p_market_id loop
+      v_refund := case when r.shares > 0 then r.amount * (r.shares_open / r.shares) else 0 end;
+      if v_refund > 0 then
+        update public.profiles set balance = balance + v_refund where id = r.user_id;
+        insert into public.transactions (user_id, type, amount, market_id)
+        values (r.user_id, 'refund', v_refund, p_market_id);
+      end if;
+      update public.bets set payout = v_refund where id = r.id;
+    end loop;
+  else
+    for r in select id, user_id, side, shares_open from public.bets where market_id = p_market_id loop
+      if r.side = p_outcome and r.shares_open > 0 then
+        update public.profiles set balance = balance + r.shares_open where id = r.user_id;
+        update public.bets set payout = r.shares_open where id = r.id;
+        insert into public.transactions (user_id, type, amount, market_id)
+        values (r.user_id, 'payout', r.shares_open, p_market_id);
+      else
+        update public.bets set payout = 0 where id = r.id;
+      end if;
+    end loop;
+  end if;
+
+  update public.markets set resolved_outcome = p_outcome, resolved_at = now() where id = p_market_id;
+end;
+$$;
+
+revoke execute on function public.sell_position(uuid, text, numeric) from public, anon;
+grant execute on function public.sell_position(uuid, text, numeric) to authenticated;
+
+-- activity_feed gains cash-out events.
+create or replace view public.activity_feed
+with (security_invoker = true) as
+select b.id, 'punt'::text as kind, b.created_at, b.user_id as actor_id,
+  pr.username as actor_username, pr.avatar_emoji as actor_emoji, pr.avatar_url as actor_avatar_url,
+  b.market_id, m.question, b.side, b.amount, b.price_avg, null::text as outcome
+from public.bets b
+join public.profiles pr on pr.id = b.user_id
+join public.markets m on m.id = b.market_id
+union all
+select m.id, 'result'::text, m.resolved_at, m.creator_id,
+  pr.username, pr.avatar_emoji, pr.avatar_url,
+  m.id, m.question, null::text, null::numeric, null::numeric, m.resolved_outcome
+from public.markets m
+join public.profiles pr on pr.id = m.creator_id
+where m.resolved_at is not null
+union all
+select t.id, 'cashout'::text, t.created_at, t.user_id,
+  pr.username, pr.avatar_emoji, pr.avatar_url,
+  t.market_id, m.question, null::text, t.amount, null::numeric, null::text
+from public.transactions t
+join public.profiles pr on pr.id = t.user_id
+join public.markets m on m.id = t.market_id
+where t.type = 'cashout'
+union all
+select t.id, 'bailout'::text, t.created_at, t.user_id,
+  pr.username, pr.avatar_emoji, pr.avatar_url,
+  null::uuid, null::text, null::text, t.amount, null::numeric, null::text
+from public.transactions t
+join public.profiles pr on pr.id = t.user_id
+where t.type = 'bailout';
+
+grant select on public.activity_feed to anon, authenticated;

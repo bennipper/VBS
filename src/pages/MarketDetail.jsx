@@ -7,8 +7,8 @@ import ProbChart from '../components/ProbChart.jsx'
 import BetSlip from '../components/BetSlip.jsx'
 import ReactionBar from '../components/ReactionBar.jsx'
 import Avatar from '../components/Avatar.jsx'
-import { probYes } from '../lib/cpmm.js'
-import { money, priceLabel, relTime, timeLeft } from '../lib/format.js'
+import { probYes, sellPreview } from '../lib/cpmm.js'
+import { money, priceLabel, relTime, timeLeft, shares as fmtShares } from '../lib/format.js'
 
 function Outcome({ outcome }) {
   const cls = outcome === 'YES' ? 'badge-yes' : outcome === 'NO' ? 'badge-no' : 'badge-void'
@@ -17,7 +17,7 @@ function Outcome({ outcome }) {
 
 export default function MarketDetail() {
   const { id } = useParams()
-  const { user, profile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -27,6 +27,8 @@ export default function MarketDetail() {
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState(false)
   const [resolveError, setResolveError] = useState('')
+  const [cashingOut, setCashingOut] = useState(false)
+  const [cashoutError, setCashoutError] = useState('')
 
   const loadMarket = useCallback(async () => {
     const { data } = await supabase.from('market_summary').select('*').eq('id', id).maybeSingle()
@@ -136,6 +138,31 @@ export default function MarketDetail() {
     loadBets()
   }
 
+  async function cashOut(side) {
+    setCashoutError('')
+    if (!window.confirm(`Cash out your ${side} position at the current price?`)) return
+    setCashingOut(true)
+    const { error } = await supabase.rpc('sell_position', {
+      p_market_id: id,
+      p_side: side,
+      p_shares: null, // sell the whole position
+    })
+    setCashingOut(false)
+    if (error) {
+      setCashoutError(error.message)
+      return
+    }
+    refreshProfile()
+    loadMarket()
+    loadBets()
+  }
+
+  // Your open position on this market (unsold shares per side).
+  const myBets = user ? bets.filter((b) => b.user_id === user.id) : []
+  const posYes = myBets.filter((b) => b.side === 'YES').reduce((a, b) => a + Number(b.shares_open || 0), 0)
+  const posNo = myBets.filter((b) => b.side === 'NO').reduce((a, b) => a + Number(b.shares_open || 0), 0)
+  const hasPosition = !isResolved && (posYes > 0.0001 || posNo > 0.0001)
+
   const feed = [...bets].reverse() // newest first
 
   return (
@@ -190,6 +217,42 @@ export default function MarketDetail() {
       <div className="card">
         <ProbChart points={bets} />
       </div>
+
+      {/* Your position + cash out */}
+      {hasPosition && (
+        <>
+          <div className="section-head"><h2>Your position</h2></div>
+          <div className="card stack">
+            {cashoutError && <div className="error-box">{cashoutError}</div>}
+            {posYes > 0.0001 && (
+              <div className="row-between">
+                <div>
+                  <div><span className="pill-side pill-yes">YES</span> <span className="tnum">{fmtShares(posYes)}</span> shares</div>
+                  <div className="faint tnum" style={{ fontSize: 12.5, marginTop: 2 }}>
+                    cash out ≈ {money(sellPreview(poolYes, poolNo, 'YES', posYes).proceeds)}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" disabled={cashingOut} onClick={() => cashOut('YES')}>
+                  {cashingOut ? <span className="spin" /> : 'Cash out'}
+                </button>
+              </div>
+            )}
+            {posNo > 0.0001 && (
+              <div className="row-between">
+                <div>
+                  <div><span className="pill-side pill-no">NO</span> <span className="tnum">{fmtShares(posNo)}</span> shares</div>
+                  <div className="faint tnum" style={{ fontSize: 12.5, marginTop: 2 }}>
+                    cash out ≈ {money(sellPreview(poolYes, poolNo, 'NO', posNo).proceeds)}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" disabled={cashingOut} onClick={() => cashOut('NO')}>
+                  {cashingOut ? <span className="spin" /> : 'Cash out'}
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Bet slip */}
       {canBet ? (
