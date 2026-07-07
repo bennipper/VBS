@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import ProbNumber from './ProbNumber.jsx'
+import Avatar from './Avatar.jsx'
 import { probYes, previewBet } from '../lib/cpmm.js'
 import { money, priceLabel, timeLeft } from '../lib/format.js'
 
@@ -22,7 +23,7 @@ export default function MarketCard({ m }) {
     <div className="card market-card" onClick={() => go()} role="button">
       <div className="q">{m.question}</div>
       <div className="meta">
-        <span>{m.creator_emoji} {m.creator_username}</span>
+        <span><Avatar url={m.creator_avatar_url} emoji={m.creator_emoji} size={15} /> {m.creator_username}</span>
         <span className="dot">{money(m.volume, { compact: true })} vol</span>
         <span className="dot">{m.bet_count} punt{Number(m.bet_count) === 1 ? '' : 's'}</span>
         {tl && <span className="dot">{tl === 'closed' ? 'betting closed' : `closes ${tl}`}</span>}

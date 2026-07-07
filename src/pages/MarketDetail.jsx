@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext.jsx'
 import ProbNumber from '../components/ProbNumber.jsx'
 import ProbChart from '../components/ProbChart.jsx'
 import BetSlip from '../components/BetSlip.jsx'
+import ReactionBar from '../components/ReactionBar.jsx'
+import Avatar from '../components/Avatar.jsx'
 import { probYes } from '../lib/cpmm.js'
 import { money, priceLabel, relTime, timeLeft } from '../lib/format.js'
 
@@ -21,6 +23,7 @@ export default function MarketDetail() {
 
   const [market, setMarket] = useState(null)
   const [bets, setBets] = useState([]) // chronological asc
+  const [reactions, setReactions] = useState([]) // [{ bet_id, user_id, emoji }]
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState(false)
   const [resolveError, setResolveError] = useState('')
@@ -33,15 +36,36 @@ export default function MarketDetail() {
   const loadBets = useCallback(async () => {
     const { data } = await supabase
       .from('bets')
-      .select('*, user:profiles!user_id(username, avatar_emoji)')
+      .select('*, user:profiles!user_id(username, avatar_emoji, avatar_url)')
       .eq('market_id', id)
       .order('created_at', { ascending: true })
     setBets(data ?? [])
   }, [id])
 
+  const loadReactions = useCallback(async () => {
+    const { data } = await supabase
+      .from('bet_reactions')
+      .select('bet_id, user_id, emoji, bets!inner(market_id)')
+      .eq('bets.market_id', id)
+    setReactions((data ?? []).map((r) => ({ bet_id: r.bet_id, user_id: r.user_id, emoji: r.emoji })))
+  }, [id])
+
+  // Optimistic local toggle so a tap feels instant; realtime reconciles.
+  const toggleReactionLocal = useCallback(
+    (betId, emoji, added) => {
+      setReactions((prev) => {
+        if (added) return [...prev, { bet_id: betId, user_id: user.id, emoji }]
+        return prev.filter(
+          (r) => !(r.bet_id === betId && r.user_id === user.id && r.emoji === emoji)
+        )
+      })
+    },
+    [user?.id]
+  )
+
   useEffect(() => {
-    Promise.all([loadMarket(), loadBets()]).then(() => setLoading(false))
-  }, [loadMarket, loadBets])
+    Promise.all([loadMarket(), loadBets(), loadReactions()]).then(() => setLoading(false))
+  }, [loadMarket, loadBets, loadReactions])
 
   // Realtime: pools + new bets.
   useEffect(() => {
@@ -62,11 +86,18 @@ export default function MarketDetail() {
           loadMarket()
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bet_reactions' },
+        () => {
+          loadReactions()
+        }
+      )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [id, loadMarket, loadBets])
+  }, [id, loadMarket, loadBets, loadReactions])
 
   if (loading) return <div className="loading-full"><div className="spin" /></div>
   if (!market) {
@@ -121,7 +152,8 @@ export default function MarketDetail() {
         </div>
         <div className="meta market-card" style={{ marginTop: 8 }}>
           <span className="faint" style={{ fontSize: 12.5 }}>
-            by {market.creator_emoji} <Link to={`/u/${market.creator_id}`} className="muted">{market.creator_username}</Link>
+            by <Avatar url={market.creator_avatar_url} emoji={market.creator_emoji} size={14} />{' '}
+            <Link to={`/u/${market.creator_id}`} className="muted">{market.creator_username}</Link>
             {' · '}opened {relTime(market.created_at)}
             {market.closes_at && !isResolved && ` · ${closed ? 'betting closed' : `closes ${timeLeft(market.closes_at)}`}`}
           </span>
@@ -212,13 +244,21 @@ export default function MarketDetail() {
           </div>
         ) : (
           feed.map((b) => (
-            <div className="feed-row" key={b.id}>
-              <span className="av">{b.user?.avatar_emoji ?? '🎲'}</span>
-              <span className="txt">
-                <b>{b.user?.username ?? 'someone'}</b> put {money(b.amount, { compact: true })} on{' '}
-                <span className={`pill-side ${b.side === 'YES' ? 'pill-yes' : 'pill-no'}`}>{b.side}</span>{' '}
-                @ <span className="tnum">{priceLabel(b.price_avg)}</span>
-              </span>
+            <div className="feed-row feed-row-react" key={b.id}>
+              <span className="av"><Avatar url={b.user?.avatar_url} emoji={b.user?.avatar_emoji} size={22} /></span>
+              <div style={{ flex: 1 }}>
+                <span className="txt">
+                  <b>{b.user?.username ?? 'someone'}</b> put {money(b.amount, { compact: true })} on{' '}
+                  <span className={`pill-side ${b.side === 'YES' ? 'pill-yes' : 'pill-no'}`}>{b.side}</span>{' '}
+                  @ <span className="tnum">{priceLabel(b.price_avg)}</span>
+                </span>
+                <ReactionBar
+                  betId={b.id}
+                  reactions={reactions.filter((r) => r.bet_id === b.id)}
+                  userId={user?.id}
+                  onChange={(emoji, added) => toggleReactionLocal(b.id, emoji, added)}
+                />
+              </div>
               <span className="when">{relTime(b.created_at)}</span>
             </div>
           ))

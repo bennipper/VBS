@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { signedMoney } from '../lib/format.js'
+import Avatar from '../components/Avatar.jsx'
 
 export default function Leaderboard() {
   const { user } = useAuth()
@@ -12,7 +13,7 @@ export default function Leaderboard() {
   useEffect(() => {
     async function load() {
       const [{ data: profiles }, { data: bets }] = await Promise.all([
-        supabase.from('profiles').select('id, username, avatar_emoji, bailout_count'),
+        supabase.from('profiles').select('id, username, avatar_emoji, avatar_url, bailout_count'),
         supabase.from('bets').select('user_id, amount, payout'),
       ])
 
@@ -57,7 +58,7 @@ export default function Leaderboard() {
           {rows.map((r, i) => (
             <div className="lb-row" key={r.id}>
               <span className={`lb-rank${i < 3 ? ' top' : ''}`}>{i + 1}</span>
-              <span className="lb-av">{r.avatar_emoji}</span>
+              <span className="lb-av"><Avatar url={r.avatar_url} emoji={r.avatar_emoji} size={22} /></span>
               <span className="lb-name">
                 <Link to={r.id === user?.id ? '/me' : `/u/${r.id}`}>
                   {r.username}

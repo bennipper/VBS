@@ -443,3 +443,126 @@ end $$;
 -- can't double-spend because their profile row is locked before the balance
 -- check. See the FOR UPDATE clauses above.
 -- ============================================================================
+
+
+-- ============================================================================
+-- V2 · Phase 1 — custom avatars, bet reactions, activity feed.
+-- (Applied to the live DB as migration vbs_v2_phase1_reactions_avatars_activity.)
+-- ============================================================================
+
+-- ---- Custom profile pictures ----------------------------------------------
+-- avatar_url is cosmetic; the "update own profile cosmetics" policy + money
+-- guard already let the owner set it while blocking balance edits.
+alter table public.profiles add column if not exists avatar_url text;
+
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "avatars read" on storage.objects;
+create policy "avatars read" on storage.objects
+  for select using (bucket_id = 'avatars');
+
+drop policy if exists "avatars insert own" on storage.objects;
+create policy "avatars insert own" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "avatars update own" on storage.objects;
+create policy "avatars update own" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "avatars delete own" on storage.objects;
+create policy "avatars delete own" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---- Reactions on bets (WhatsApp-style) -----------------------------------
+create table if not exists public.bet_reactions (
+  id uuid primary key default gen_random_uuid(),
+  bet_id uuid not null references public.bets on delete cascade,
+  user_id uuid not null references public.profiles on delete cascade,
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  unique (bet_id, user_id, emoji)
+);
+create index if not exists bet_reactions_bet_idx on public.bet_reactions (bet_id);
+
+alter table public.bet_reactions enable row level security;
+
+drop policy if exists "read reactions" on public.bet_reactions;
+create policy "read reactions" on public.bet_reactions for select using (true);
+
+-- Reactions move no money, so direct writes of your OWN reaction are allowed.
+drop policy if exists "add own reaction" on public.bet_reactions;
+create policy "add own reaction" on public.bet_reactions
+  for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "remove own reaction" on public.bet_reactions;
+create policy "remove own reaction" on public.bet_reactions
+  for delete to authenticated using (auth.uid() = user_id);
+
+-- ---- Feed view gains the creator's avatar_url -----------------------------
+drop view if exists public.market_summary;
+create view public.market_summary
+with (security_invoker = true) as
+select
+  m.id, m.creator_id, m.question, m.description, m.pool_yes, m.pool_no,
+  m.closes_at, m.resolved_outcome, m.resolved_at, m.created_at,
+  p.username as creator_username,
+  p.avatar_emoji as creator_emoji,
+  p.avatar_url as creator_avatar_url,
+  coalesce(b.volume, 0) as volume,
+  coalesce(b.bet_count, 0) as bet_count
+from public.markets m
+join public.profiles p on p.id = m.creator_id
+left join (
+  select market_id, sum(amount) as volume, count(*) as bet_count
+  from public.bets group by market_id
+) b on b.market_id = m.id;
+
+grant select on public.market_summary to anon, authenticated;
+
+-- ---- Activity feed: punts + results + bailouts ----------------------------
+drop view if exists public.activity_feed;
+create view public.activity_feed
+with (security_invoker = true) as
+select
+  b.id, 'punt'::text as kind, b.created_at,
+  b.user_id as actor_id, pr.username as actor_username,
+  pr.avatar_emoji as actor_emoji, pr.avatar_url as actor_avatar_url,
+  b.market_id, m.question, b.side, b.amount, b.price_avg, null::text as outcome
+from public.bets b
+join public.profiles pr on pr.id = b.user_id
+join public.markets m on m.id = b.market_id
+union all
+select
+  m.id, 'result'::text, m.resolved_at, m.creator_id,
+  pr.username, pr.avatar_emoji, pr.avatar_url,
+  m.id, m.question, null::text, null::numeric, null::numeric, m.resolved_outcome
+from public.markets m
+join public.profiles pr on pr.id = m.creator_id
+where m.resolved_at is not null
+union all
+select
+  t.id, 'bailout'::text, t.created_at, t.user_id,
+  pr.username, pr.avatar_emoji, pr.avatar_url,
+  null::uuid, null::text, null::text, t.amount, null::numeric, null::text
+from public.transactions t
+join public.profiles pr on pr.id = t.user_id
+where t.type = 'bailout';
+
+grant select on public.activity_feed to anon, authenticated;
+
+-- Realtime for reactions (idempotent).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'bet_reactions'
+  ) then
+    execute 'alter publication supabase_realtime add table public.bet_reactions';
+  end if;
+end $$;

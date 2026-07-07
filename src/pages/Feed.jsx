@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import MarketCard from '../components/MarketCard.jsx'
+import ActivityTicker from '../components/ActivityTicker.jsx'
 import { APP_NAME } from '../config.js'
 
 export default function Feed() {
@@ -40,6 +41,8 @@ export default function Feed() {
 
   return (
     <>
+      <ActivityTicker />
+
       <div className="section-head">
         <h2>The book</h2>
         <div className="tabs">

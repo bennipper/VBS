@@ -2,6 +2,7 @@ import { NavLink, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { APP_NAME } from '../config.js'
 import { money } from '../lib/format.js'
+import Avatar from './Avatar.jsx'
 
 function NavItem({ to, ico, label, end }) {
   return (
@@ -26,7 +27,7 @@ export default function Layout({ children }) {
             <small>bookmaker</small>
           </Link>
           <Link to="/me" className="bal-pill tnum" title="Your balance">
-            <span className="em">{profile?.avatar_emoji ?? '🎲'}</span>
+            <Avatar url={profile?.avatar_url} emoji={profile?.avatar_emoji} size={18} />
             {money(profile?.balance ?? 0, { compact: true })}
           </Link>
         </div>

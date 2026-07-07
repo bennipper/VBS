@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { money, signedMoney, priceLabel, relTime } from '../lib/format.js'
-import { BAILOUT_THRESHOLD, BAILOUT_AMOUNT } from '../config.js'
+import { BAILOUT_THRESHOLD, BAILOUT_AMOUNT, AVATAR_BUCKET, AVATAR_MAX_BYTES } from '../config.js'
+import Avatar from '../components/Avatar.jsx'
 
 function computeStats(bets) {
   let staked = 0
@@ -48,6 +49,9 @@ export default function Profile() {
   const [loading, setLoading] = useState(true)
   const [bailoutBusy, setBailoutBusy] = useState(false)
   const [bailoutError, setBailoutError] = useState('')
+  const fileRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
 
   const load = useCallback(async () => {
     const [{ data: p }, { data: b }] = await Promise.all([
@@ -70,6 +74,45 @@ export default function Profile() {
 
   // Keep own header balance fresh via context.
   const shownProfile = isMe && myProfile ? myProfile : profile
+
+  async function onPickAvatar(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadErr('')
+    if (!file.type.startsWith('image/')) {
+      setUploadErr('Pick an image file.')
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setUploadErr('Image too big — 5 MB max.')
+      return
+    }
+    setUploading(true)
+    // Path must start with the user's id to satisfy the storage RLS policy.
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const path = `${user.id}/avatar-${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .upload(path, file, { cacheControl: '3600', upsert: true })
+    if (upErr) {
+      setUploadErr(upErr.message)
+      setUploading(false)
+      return
+    }
+    const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
+    const { error: updErr } = await supabase
+      .from('profiles')
+      .update({ avatar_url: pub.publicUrl })
+      .eq('id', user.id)
+    setUploading(false)
+    if (e.target) e.target.value = ''
+    if (updErr) {
+      setUploadErr(updErr.message)
+      return
+    }
+    refreshProfile()
+    load()
+  }
 
   async function claimBailout() {
     setBailoutError('')
@@ -112,8 +155,27 @@ export default function Profile() {
 
       {/* Identity + balance */}
       <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span style={{ fontSize: 40 }}>{shownProfile.avatar_emoji}</span>
+        <div className="avatar-upload">
+          {isMe ? (
+            <button
+              className="current"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              title="Change photo"
+            >
+              <Avatar url={shownProfile.avatar_url} emoji={shownProfile.avatar_emoji} size={56} />
+              <span className="avatar-edit-badge">{uploading ? '…' : '✎'}</span>
+            </button>
+          ) : (
+            <Avatar url={shownProfile.avatar_url} emoji={shownProfile.avatar_emoji} size={56} />
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden-file"
+            onChange={onPickAvatar}
+          />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{shownProfile.username}</div>
             <div className="faint" style={{ fontSize: 12.5 }}>
@@ -122,6 +184,8 @@ export default function Profile() {
             </div>
           </div>
         </div>
+
+        {isMe && uploadErr && <div className="error-box" style={{ marginTop: 12 }}>{uploadErr}</div>}
 
         <hr className="divider" />
         <div className="row-between">

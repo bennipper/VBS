@@ -342,6 +342,9 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .pill-yes { color: var(--green); background: var(--green-ink); }
 .pill-no { color: var(--red); background: var(--red-ink); }
 .feed-row .when { color: var(--paper-faint); font-size: 12px; font-family: var(--font-num); }
+.feed-row-react { align-items: flex-start; }
+.feed-row-react .av { margin-top: 1px; }
+.feed-row-react .when { margin-top: 2px; }
 
 /* ---- Stats / rows -------------------------------------------------------- */
 
@@ -399,6 +402,70 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .auth-brand .mk { font-size: 34px; font-weight: 800; letter-spacing: 0.16em; }
 .auth-brand .tag { color: var(--paper-faint); font-size: 13px; letter-spacing: 0.04em; margin-top: 4px; }
 .auth-toggle { text-align: center; margin-top: 18px; font-size: 14px; color: var(--paper-dim); }
+
+/* Avatars */
+.avatar-img { border-radius: 50%; object-fit: cover; display: inline-block; vertical-align: middle; background: var(--ink-2); border: 1px solid var(--line); }
+.avatar-emoji { display: inline-block; vertical-align: middle; }
+
+/* Reactions */
+.reaction-bar { position: relative; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.react-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--ink-2);
+  font-size: 12.5px; line-height: 1.5;
+}
+.react-pill .tnum { color: var(--paper-dim); font-size: 11px; }
+.react-pill.mine { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, var(--ink-2)); }
+.react-pill.mine .tnum { color: var(--paper); }
+.react-add {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 22px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: transparent; color: var(--paper-faint);
+  position: relative;
+}
+.react-add:hover { color: var(--paper); border-color: var(--paper-dim); }
+.react-add-ico { font-size: 13px; }
+.react-add-plus { font-size: 10px; margin-left: 1px; margin-top: -4px; }
+.react-picker {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30;
+  display: flex; gap: 2px; padding: 5px 6px;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.react-choice { font-size: 20px; padding: 3px; border-radius: 50%; transition: transform 0.08s ease; }
+.react-choice:hover { transform: scale(1.25); }
+.react-choice.mine { background: color-mix(in srgb, var(--gold) 20%, transparent); }
+
+/* Ticker */
+.ticker {
+  display: flex; align-items: stretch; gap: 0;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--ink-2); overflow: hidden; margin: 14px 0 4px;
+}
+.ticker-label {
+  display: flex; align-items: center; padding: 0 10px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.12em; color: var(--red);
+  border-right: 1px solid var(--line); background: var(--card); flex-shrink: 0;
+}
+.ticker-viewport { overflow: hidden; flex: 1; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.ticker-track { display: inline-flex; align-items: center; white-space: nowrap; animation: ticker 42s linear infinite; }
+.ticker-viewport:hover .ticker-track, .ticker-viewport:active .ticker-track { animation-play-state: paused; }
+.ticker-item {
+  font-size: 12.5px; color: var(--paper-dim); padding: 8px 14px;
+  border-right: 1px solid var(--line); white-space: nowrap;
+}
+.ticker-item b { color: var(--paper); font-weight: 650; }
+.tk-yes { color: var(--green); font-weight: 700; }
+.tk-no { color: var(--red); font-weight: 700; }
+.tk-void { color: var(--paper-dim); font-weight: 700; }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* Avatar upload */
+.avatar-upload { display: flex; align-items: center; gap: 14px; }
+.avatar-upload .current { position: relative; }
+.avatar-edit-badge { position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 11px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--card); }
+.hidden-file { display: none; }
 
 /* Chart */
 .chart-wrap { position: relative; }

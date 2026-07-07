@@ -24,3 +24,10 @@ export const AVATAR_EMOJIS = [
 ]
 
 export const DEFAULT_AVATAR = '🎲'
+
+// Reactions you can slap on a punt (WhatsApp-style).
+export const REACTION_EMOJIS = ['👍', '😂', '😮', '😢', '💀', '🔥', '🐐', '🤡']
+
+// Avatar upload limits.
+export const AVATAR_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+export const AVATAR_BUCKET = 'avatars'
