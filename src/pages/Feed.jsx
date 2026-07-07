@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import MarketCard from '../components/MarketCard.jsx'
@@ -29,7 +29,6 @@ function sortMarkets(list, sort) {
 
 export default function Feed() {
   const { user, profile } = useAuth()
-  const navigate = useNavigate()
   const [markets, setMarkets] = useState([])
   const [pl, setPl] = useState(0)
   const [tab, setTab] = useState('open') // 'open' | 'resolved'
@@ -93,21 +92,12 @@ export default function Feed() {
     <>
       {/* Balance hero */}
       <div className="balance-hero">
-        <div className="row-between" style={{ alignItems: 'flex-start' }}>
-          <div>
-            <div className="lbl">Available balance</div>
-            <div className="amt">{money(profile?.balance ?? 0)}</div>
-            <div className="row">
-              <span className={`pl-pill ${plState}`}>
-                {pl > 0 ? '↑' : pl < 0 ? '↓' : '·'} {signedMoney(pl)}
-              </span>
-              <span className="faint" style={{ fontSize: 12 }}>all-time P/L</span>
-            </div>
-          </div>
-          <div className="hero-actions">
-            <button className="hero-btn" title="Leaderboard" onClick={() => navigate('/leaderboard')}>🏆</button>
-            <button className="hero-btn brand" title="New market" onClick={() => navigate('/create')}>+</button>
-          </div>
+        <div className="lbl">Available balance</div>
+        <div className="amt-row">
+          <div className="amt">{money(profile?.balance ?? 0)}</div>
+          <span className={`pl-pill ${plState}`} title="All-time P/L">
+            {pl > 0 ? '↑' : pl < 0 ? '↓' : '·'} {signedMoney(pl)}
+          </span>
         </div>
       </div>
 

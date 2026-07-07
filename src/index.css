@@ -489,11 +489,11 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 /* Home balance hero */
 .balance-hero { padding: 16px 2px 4px; }
 .balance-hero .lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--paper-dim); font-weight: 700; }
+.balance-hero .amt-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
 .balance-hero .amt {
   font-family: var(--font-num); font-variant-numeric: tabular-nums lining-nums;
-  font-weight: 800; font-size: 42px; letter-spacing: -0.02em; line-height: 1.05; margin-top: 3px;
+  font-weight: 800; font-size: 42px; letter-spacing: -0.02em; line-height: 1.05;
 }
-.balance-hero .row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .pl-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
 .pl-pill.up { background: var(--green-ink); color: var(--green); }
 .pl-pill.down { background: var(--red-ink); color: var(--red); }
