@@ -809,3 +809,36 @@ join public.profiles pr on pr.id = t.user_id
 where t.type = 'bailout';
 
 grant select on public.activity_feed to anon, authenticated;
+
+
+-- ============================================================================
+-- V2 · Categories — markets tagged for the Polymarket-style filter tabs.
+-- (Applied live as migration vbs_v2_market_categories.)
+-- ============================================================================
+
+alter table public.markets
+  add column if not exists category text not null default 'Social'
+  check (category in ('Work', 'Social', 'Sports', 'Food', 'Dares'));
+
+create index if not exists markets_category_idx on public.markets (category);
+
+-- market_summary exposes category (drop + recreate to add the column).
+drop view if exists public.market_summary;
+create view public.market_summary
+with (security_invoker = true) as
+select
+  m.id, m.creator_id, m.question, m.description, m.category, m.pool_yes, m.pool_no,
+  m.closes_at, m.resolved_outcome, m.resolved_at, m.created_at,
+  p.username as creator_username,
+  p.avatar_emoji as creator_emoji,
+  p.avatar_url as creator_avatar_url,
+  coalesce(b.volume, 0) as volume,
+  coalesce(b.bet_count, 0) as bet_count
+from public.markets m
+join public.profiles p on p.id = m.creator_id
+left join (
+  select market_id, sum(amount) as volume, count(*) as bet_count
+  from public.bets group by market_id
+) b on b.market_id = m.id;
+
+grant select on public.market_summary to anon, authenticated;

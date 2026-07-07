@@ -32,6 +32,26 @@ export const DEFAULT_AVATAR = '🎲'
 // Reactions you can slap on a punt (WhatsApp-style).
 export const REACTION_EMOJIS = ['👍', '😂', '😮', '😢', '💀', '🔥', '🐐', '🤡']
 
+// Market categories for filtering. Keep in sync with the check in schema.sql.
+export const CATEGORIES = ['Work', 'Social', 'Sports', 'Food', 'Dares']
+export const CATEGORY_EMOJI = {
+  Work: '💼',
+  Social: '🍻',
+  Sports: '⚽',
+  Food: '🍔',
+  Dares: '😈',
+}
+export const DEFAULT_CATEGORY = 'Social'
+
+// Sort orders for the feed.
+export const SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+  { key: 'volume', label: 'Most bet' },
+  { key: 'odds_high', label: 'Highest odds' },
+  { key: 'odds_low', label: 'Lowest odds' },
+]
+
 // Avatar upload limits.
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 export const AVATAR_BUCKET = 'avatars'

@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { seedPools } from '../lib/cpmm.js'
-import { SEED_LIQUIDITY } from '../config.js'
+import { SEED_LIQUIDITY, CATEGORIES, CATEGORY_EMOJI, DEFAULT_CATEGORY } from '../config.js'
 
 export default function CreateMarket() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [question, setQuestion] = useState('')
   const [description, setDescription] = useState('')
+  const [category, setCategory] = useState(DEFAULT_CATEGORY)
   const [closesAt, setClosesAt] = useState('')
   const [startProb, setStartProb] = useState(50)
   const [error, setError] = useState('')
@@ -33,6 +34,7 @@ export default function CreateMarket() {
         creator_id: user.id,
         question: q,
         description: description.trim() || null,
+        category,
         pool_yes: poolYes,
         pool_no: poolNo,
         closes_at: closesAt ? new Date(closesAt).toISOString() : null,
@@ -71,6 +73,23 @@ export default function CreateMarket() {
         </div>
 
         <div className="field">
+          <label>Category</label>
+          <div className="chips" style={{ flexWrap: 'wrap' }}>
+            {CATEGORIES.map((c) => (
+              <button
+                type="button"
+                key={c}
+                className={`chip${category === c ? ' sel' : ''}`}
+                onClick={() => setCategory(c)}
+                style={{ flex: '0 1 auto' }}
+              >
+                {CATEGORY_EMOJI[c]} {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
           <label>Resolution criteria <span className="faint">(optional)</span></label>
           <textarea
             className="textarea"
@@ -102,7 +121,7 @@ export default function CreateMarket() {
             max="99"
             value={startProb}
             onChange={(e) => setStartProb(Number(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--paper)' }}
+            style={{ width: '100%', accentColor: 'var(--brand)' }}
           />
           <div className="hint">Default 50/50. The house seeds the liquidity — costs you nothing.</div>
         </div>
