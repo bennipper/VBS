@@ -27,8 +27,10 @@ export default function MarketDetail() {
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState(false)
   const [resolveError, setResolveError] = useState('')
+  const [confirmOutcome, setConfirmOutcome] = useState(null) // pending resolve outcome
   const [cashingOut, setCashingOut] = useState(false)
   const [cashoutError, setCashoutError] = useState('')
+  const [confirmCashout, setConfirmCashout] = useState(null) // pending cash-out side
 
   const loadMarket = useCallback(async () => {
     const { data } = await supabase.from('market_summary').select('*').eq('id', id).maybeSingle()
@@ -122,8 +124,7 @@ export default function MarketDetail() {
 
   async function resolve(outcome) {
     setResolveError('')
-    const label = outcome === 'VOID' ? 'VOID (refund everyone)' : outcome
-    if (!window.confirm(`Settle this market as ${label}? This pays out and can't be undone.`)) return
+    setConfirmOutcome(null)
     setResolving(true)
     const { error } = await supabase.rpc('resolve_market', {
       p_market_id: id,
@@ -140,7 +141,7 @@ export default function MarketDetail() {
 
   async function cashOut(side) {
     setCashoutError('')
-    if (!window.confirm(`Cash out your ${side} position at the current price?`)) return
+    setConfirmCashout(null)
     setCashingOut(true)
     const { error } = await supabase.rpc('sell_position', {
       p_market_id: id,
@@ -232,9 +233,16 @@ export default function MarketDetail() {
                     cash out ≈ {money(sellPreview(poolYes, poolNo, 'YES', posYes).proceeds)}
                   </div>
                 </div>
-                <button className="btn btn-ghost btn-sm" disabled={cashingOut} onClick={() => cashOut('YES')}>
-                  {cashingOut ? <span className="spin" /> : 'Cash out'}
-                </button>
+                {confirmCashout === 'YES' ? (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button className="btn btn-primary btn-sm" disabled={cashingOut} onClick={() => cashOut('YES')}>
+                      {cashingOut ? <span className="spin" /> : `Confirm ${money(sellPreview(poolYes, poolNo, 'YES', posYes).proceeds, { compact: true })}`}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" disabled={cashingOut} onClick={() => setConfirmCashout(null)}>✕</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setConfirmCashout('YES')}>Cash out</button>
+                )}
               </div>
             )}
             {posNo > 0.0001 && (
@@ -245,9 +253,16 @@ export default function MarketDetail() {
                     cash out ≈ {money(sellPreview(poolYes, poolNo, 'NO', posNo).proceeds)}
                   </div>
                 </div>
-                <button className="btn btn-ghost btn-sm" disabled={cashingOut} onClick={() => cashOut('NO')}>
-                  {cashingOut ? <span className="spin" /> : 'Cash out'}
-                </button>
+                {confirmCashout === 'NO' ? (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button className="btn btn-primary btn-sm" disabled={cashingOut} onClick={() => cashOut('NO')}>
+                      {cashingOut ? <span className="spin" /> : `Confirm ${money(sellPreview(poolYes, poolNo, 'NO', posNo).proceeds, { compact: true })}`}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" disabled={cashingOut} onClick={() => setConfirmCashout(null)}>✕</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setConfirmCashout('NO')}>Cash out</button>
+                )}
               </div>
             )}
           </div>
@@ -287,13 +302,36 @@ export default function MarketDetail() {
               You opened it, you call it. Pays out immediately and can't be undone.
             </p>
             {resolveError && <div className="error-box">{resolveError}</div>}
-            <div className="chips">
-              <button className="btn btn-yes" disabled={resolving} onClick={() => resolve('YES')}>YES won</button>
-              <button className="btn btn-no" disabled={resolving} onClick={() => resolve('NO')}>NO won</button>
-            </div>
-            <button className="btn btn-ghost" disabled={resolving} onClick={() => resolve('VOID')}>
-              Void &amp; refund everyone
-            </button>
+            {confirmOutcome ? (
+              <>
+                <div className="note-box">
+                  Settle as <b>{confirmOutcome === 'VOID' ? 'VOID (refund everyone)' : `${confirmOutcome} won`}</b>?
+                  This pays out immediately and can’t be undone.
+                </div>
+                <div className="chips">
+                  <button
+                    className={`btn ${confirmOutcome === 'YES' ? 'btn-yes' : confirmOutcome === 'NO' ? 'btn-no' : 'btn-primary'}`}
+                    disabled={resolving}
+                    onClick={() => resolve(confirmOutcome)}
+                  >
+                    {resolving ? <span className="spin" /> : `Yes, settle ${confirmOutcome}`}
+                  </button>
+                  <button className="btn btn-ghost" disabled={resolving} onClick={() => setConfirmOutcome(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="chips">
+                  <button className="btn btn-yes" onClick={() => setConfirmOutcome('YES')}>YES won</button>
+                  <button className="btn btn-no" onClick={() => setConfirmOutcome('NO')}>NO won</button>
+                </div>
+                <button className="btn btn-ghost" onClick={() => setConfirmOutcome('VOID')}>
+                  Void &amp; refund everyone
+                </button>
+              </>
+            )}
           </div>
         </>
       )}
