@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+.vercel
+
+# Local tooling / installed agent skills — not part of the app
+.agents/
+.claude/skills/
+.claude/settings.local.json
+skills-lock.json
