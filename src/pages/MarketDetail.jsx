@@ -175,7 +175,7 @@ export default function MarketDetail() {
       {/* Headline */}
       <div className="card" style={{ marginTop: 10 }}>
         <div className="row-between" style={{ alignItems: 'flex-start' }}>
-          <h1 style={{ fontSize: 21, lineHeight: 1.25, flex: 1 }}>{market.question}</h1>
+          <h1 style={{ fontSize: 21, lineHeight: 1.3, flex: 1, fontFamily: 'var(--font-num)', fontWeight: 500 }}>{market.question}</h1>
           {isResolved && <Outcome outcome={market.resolved_outcome} />}
         </div>
         <div className="meta market-card" style={{ marginTop: 8 }}>

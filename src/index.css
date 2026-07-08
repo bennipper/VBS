@@ -203,9 +203,10 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 
 .market-card { display: block; }
 .market-card .q {
+  font-family: var(--font-num); /* Space Grotesk */
   font-size: 17px;
-  font-weight: 650;
-  line-height: 1.28;
+  font-weight: 500; /* medium */
+  line-height: 1.3;
   letter-spacing: -0.01em;
 }
 .market-card .meta {
