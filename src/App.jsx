@@ -8,6 +8,7 @@ import MarketDetail from './pages/MarketDetail.jsx'
 import CreateMarket from './pages/CreateMarket.jsx'
 import Profile from './pages/Profile.jsx'
 import Leaderboard from './pages/Leaderboard.jsx'
+import Casino from './pages/Casino.jsx'
 import NotConfigured from './components/NotConfigured.jsx'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/market/:id" element={<MarketDetail />} />
         <Route path="/create" element={<CreateMarket />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/casino" element={<Casino />} />
         <Route path="/me" element={<Profile />} />
         <Route path="/u/:id" element={<Profile />} />
         <Route path="/auth" element={<Navigate to="/" replace />} />

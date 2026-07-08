@@ -157,15 +157,10 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 }
 .navitem {
   flex: 1;
-  padding: 10px 4px 12px;
+  padding: 15px 4px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 600;
+  justify-content: center;
   color: var(--paper-faint);
 }
 .navitem .ico { font-size: 19px; line-height: 1; display: flex; }
@@ -533,6 +528,39 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .sort-opt.sel { color: var(--brand); font-weight: 700; }
 
 .cat-pill { display: inline-flex; align-items: center; gap: 3px; }
+
+/* Casino — slots */
+.slot-reels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.slot-reel {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 50px; background: var(--ink-2); border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+}
+.slot-reels.spinning .slot-reel { border-color: var(--brand); }
+.slot-result { text-align: center; min-height: 22px; font-size: 14px; }
+.slot-result .win { color: var(--green); font-weight: 700; font-family: var(--font-num); }
+
+/* Casino — blackjack */
+.bj-area { }
+.bj-row-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--paper-faint); font-weight: 700; margin-bottom: 8px; }
+.bj-cards { display: flex; gap: 8px; flex-wrap: wrap; min-height: 74px; }
+.pcard {
+  width: 52px; height: 72px; border-radius: 8px; background: #f4f1e8; color: #12100c;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--font-num); box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.pcard.red { color: #c8102e; }
+.pcard .pcard-r { font-size: 20px; font-weight: 700; line-height: 1; }
+.pcard .pcard-s { font-size: 18px; line-height: 1; margin-top: 2px; }
+.pcard.back {
+  background: repeating-linear-gradient(45deg, var(--brand-soft), var(--brand-soft) 6px, #241019 6px, #241019 12px);
+  border: 1px solid var(--brand);
+}
+.bj-result { text-align: center; font-weight: 700; font-size: 16px; padding: 2px 0; }
+.bj-result.win { color: var(--green); }
+.bj-result.lose { color: var(--red); }
+.bj-result.push { color: var(--paper-dim); }
+.bj-empty { text-align: center; font-size: 14px; }
 
 /* Avatar upload */
 .avatar-upload { display: flex; align-items: center; gap: 14px; }
