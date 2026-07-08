@@ -6,7 +6,7 @@ import { signedMoney } from '../lib/format.js'
 import Avatar from '../components/Avatar.jsx'
 
 // Betting P/L only — excludes bailouts and the signup bonus.
-const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake'])
+const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake', 'daily_stake', 'daily_win'])
 
 function plByUser(txns, since, until) {
   const map = new Map()

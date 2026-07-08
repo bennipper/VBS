@@ -8,7 +8,7 @@ import { probYes } from '../lib/cpmm.js'
 import { money, signedMoney } from '../lib/format.js'
 import { APP_NAME, CATEGORIES, SORT_OPTIONS } from '../config.js'
 
-const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake'])
+const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake', 'daily_stake', 'daily_win'])
 
 function sortMarkets(list, sort) {
   const arr = [...list]

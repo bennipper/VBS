@@ -45,7 +45,7 @@ export default function Layout({ children }) {
       <nav className="bottomnav">
         <div className="bottomnav-inner">
           <NavItem to="/" ico={<Icon name="market" />} label="Markets" end />
-          <NavItem to="/casino" ico={<Icon name="casino" />} label="Casino" />
+          <NavItem to="/daily" ico={<Icon name="daily" />} label="The Daily" />
           <NavItem to="/create" ico={<Icon name="plus" />} label="New" />
           <NavItem to="/leaderboard" ico={<Icon name="table" />} label="Table" />
           <NavItem to="/me" ico={<Icon name="you" />} label="You" />

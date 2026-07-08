@@ -845,85 +845,69 @@ grant select on public.market_summary to anon, authenticated;
 
 
 -- ============================================================================
--- V3 · Casino — slots + blackjack. All RNG + payouts are server-side. Casino
--- uses its own ledger types (casino_stake/casino_win), kept OUT of the market
--- P/L, but it still drains balance as a money sink.
--- (Applied live as migrations vbs_v3_casino + vbs_v3_blackjack_fix_varnames.)
+-- V4 · The Daily — replaces the casino (dropped: play_slots, blackjack_* and
+-- blackjack_hands; casino_stake/casino_win kept in the type check for history).
+-- One shared question per London day about the group's own activity. £10 stake
+-- via RPC, winners split the pot, no winners = house keeps (sink). Questions
+-- auto-resolve from app data — no cron: get_daily() lazily settles expired
+-- questions and generates today's on first load.
+-- (Applied live as migration vbs_v4_daily_replaces_casino.)
 -- ============================================================================
 
 alter table public.transactions drop constraint if exists transactions_type_check;
 alter table public.transactions add constraint transactions_type_check
   check (type in ('bet','payout','refund','bailout','signup_bonus','cashout','rake',
-                  'casino_stake','casino_win'));
+                  'casino_stake','casino_win','daily_stake','daily_win'));
 
--- Slots: 6 uniform symbols, ~88% RTP (12% house edge).
-create or replace function public.play_slots(p_stake numeric)
-returns json language plpgsql security definer set search_path = public as $$
-declare
-  v_user uuid := auth.uid(); v_bal numeric;
-  syms text[] := array['🍒','🍋','🔔','⭐','💎','7️⃣'];
-  i1 int; i2 int; i3 int; cherries int; mult numeric := 0; payout numeric := 0;
-begin
-  if v_user is null then raise exception 'not authenticated'; end if;
-  if p_stake is null or p_stake <= 0 then raise exception 'stake must be positive'; end if;
-  if p_stake > 1000 then raise exception 'max spin is 1000'; end if;
-  select balance into v_bal from public.profiles where id = v_user for update;
-  if v_bal is null then raise exception 'profile not found'; end if;
-  if v_bal < p_stake then raise exception 'insufficient balance'; end if;
-  i1 := 1 + floor(random() * 6); i2 := 1 + floor(random() * 6); i3 := 1 + floor(random() * 6);
-  if i1 = i2 and i2 = i3 then
-    mult := case i1 when 1 then 8 when 2 then 9 when 3 then 13 when 4 then 20 when 5 then 60 when 6 then 35 end;
-  else
-    cherries := (case when i1=1 then 1 else 0 end)+(case when i2=1 then 1 else 0 end)+(case when i3=1 then 1 else 0 end);
-    if cherries = 2 then mult := 3; end if;
-  end if;
-  payout := p_stake * mult;
-  update public.profiles set balance = balance - p_stake where id = v_user;
-  insert into public.transactions (user_id, type, amount) values (v_user, 'casino_stake', -p_stake);
-  if payout > 0 then
-    update public.profiles set balance = balance + payout where id = v_user;
-    insert into public.transactions (user_id, type, amount) values (v_user, 'casino_win', payout);
-  end if;
-  return json_build_object('reels', array[syms[i1], syms[i2], syms[i3]], 'multiplier', mult,
-    'payout', payout, 'balance', (select balance from public.profiles where id = v_user));
-end; $$;
-
--- Blackjack hands (RLS on, NO read policy — the hole card only leaves via RPCs).
-create table if not exists public.blackjack_hands (
+create table if not exists public.daily_questions (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles on delete cascade,
-  stake numeric not null,
-  deck int[] not null,
-  player_cards int[] not null,
-  dealer_cards int[] not null,
-  status text not null,
-  payout numeric,
+  day date unique not null,              -- London calendar day
+  question text not null,
+  kind text not null,                    -- punt_count | volume | big_punt | bailout | new_market | member_punts
+  params jsonb not null default '{}',
+  stake numeric not null default 10,
+  opens_at timestamptz not null,
+  closes_at timestamptz not null,
+  resolved_outcome text check (resolved_outcome in ('YES','NO','VOID')),
+  resolved_at timestamptz,
   created_at timestamptz not null default now()
 );
-alter table public.blackjack_hands enable row level security;
 
--- Hand total: aces 11 then reduced to 1 as needed.
-create or replace function public.bj_total(cards int[]) returns int language plpgsql immutable as $$
-declare c int; r int; total int := 0; aces int := 0;
-begin
-  foreach c in array cards loop
-    r := c % 13;
-    if r = 0 then total := total + 11; aces := aces + 1;
-    elsif r >= 9 then total := total + 10;
-    else total := total + (r + 1); end if;
-  end loop;
-  while total > 21 and aces > 0 loop total := total - 10; aces := aces - 1; end loop;
-  return total;
-end; $$;
+create table if not exists public.daily_picks (
+  id uuid primary key default gen_random_uuid(),
+  question_id uuid not null references public.daily_questions on delete cascade,
+  user_id uuid not null references public.profiles on delete cascade,
+  side text not null check (side in ('YES','NO')),
+  payout numeric,
+  created_at timestamptz not null default now(),
+  unique (question_id, user_id)
+);
 
--- deal / hit / stand: full bodies are in migration vbs_v3_blackjack_fix_varnames
--- (v_-prefixed locals so nothing collides with blackjack_hands columns). Deal
--- shuffles 52 cards, deals 2+2, resolves naturals; hit draws (bust = lose);
--- stand plays the dealer to 17 and settles (win 2x, blackjack 2.5x, push 1x).
+alter table public.daily_questions enable row level security;
+alter table public.daily_picks enable row level security;
 
-revoke execute on function public.bj_total(int[]) from public, anon, authenticated;
-revoke execute on function public.play_slots(numeric) from public, anon;
-grant execute on function public.play_slots(numeric) to authenticated;
-grant execute on function public.blackjack_deal(numeric) to authenticated;
-grant execute on function public.blackjack_hit(uuid) to authenticated;
-grant execute on function public.blackjack_stand(uuid) to authenticated;
+drop policy if exists "read daily questions" on public.daily_questions;
+create policy "read daily questions" on public.daily_questions for select using (true);
+drop policy if exists "read daily picks" on public.daily_picks;
+create policy "read daily picks" on public.daily_picks for select using (true);
+-- No write policies: stakes move money, so only the RPCs touch these.
+
+-- Full bodies of resolve_daily_question / ensure_daily_question / get_daily /
+-- pick_daily live in migration vbs_v4_daily_replaces_casino:
+--   resolve_daily_question(id) — computes the outcome from bets/transactions/
+--     markets within [opens_at, closes_at), credits winners pot/n (VOID refunds),
+--     stamps resolved_outcome/resolved_at.
+--   ensure_daily_question()    — inserts today's question (random template,
+--     unique(day) makes it race-safe).
+--   get_daily()                — lazy housekeeping + returns today's question,
+--     my pick, participants, yesterday's result, and my pick-streak.
+--   pick_daily(id, side)       — locks the user row, checks balance/open/no
+--     prior pick, deducts the stake, inserts the pick + daily_stake tx.
+
+-- Lockdown: internal helpers not callable; user RPCs authenticated-only.
+revoke execute on function public.resolve_daily_question(uuid) from public, anon, authenticated;
+revoke execute on function public.ensure_daily_question() from public, anon, authenticated;
+revoke execute on function public.get_daily() from public, anon;
+revoke execute on function public.pick_daily(uuid, text) from public, anon;
+grant execute on function public.get_daily() to authenticated;
+grant execute on function public.pick_daily(uuid, text) to authenticated;

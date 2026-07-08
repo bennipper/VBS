@@ -9,7 +9,7 @@ import { computeAchievements } from '../lib/achievements.js'
 
 // Net P/L from the ledger — includes payouts, refunds, cash-outs and rake, minus
 // stakes. Excludes bailouts and the signup bonus (those aren't winnings).
-const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake'])
+const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake', 'daily_stake', 'daily_win'])
 function plFromTransactions(txns) {
   return txns.reduce((acc, t) => (PL_TYPES.has(t.type) ? acc + Number(t.amount) : acc), 0)
 }
