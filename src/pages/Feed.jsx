@@ -6,7 +6,7 @@ import MarketCard from '../components/MarketCard.jsx'
 import ActivityTicker from '../components/ActivityTicker.jsx'
 import { probYes } from '../lib/cpmm.js'
 import { money, signedMoney } from '../lib/format.js'
-import { CATEGORIES, CATEGORY_EMOJI, SORT_OPTIONS } from '../config.js'
+import { APP_NAME, CATEGORIES, CATEGORY_EMOJI, SORT_OPTIONS } from '../config.js'
 
 const PL_TYPES = new Set(['bet', 'payout', 'refund', 'cashout', 'rake'])
 
@@ -170,7 +170,7 @@ export default function Feed() {
 
       <div className="spacer-lg" />
       <p className="faint center" style={{ fontSize: 12 }}>
-        VBS · play money · settle your own bets · shame is the mechanic
+        {APP_NAME} · play money · settle your own bets · shame is the mechanic
       </p>
     </>
   )

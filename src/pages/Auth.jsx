@@ -59,7 +59,7 @@ export default function Auth() {
   return (
     <div className="auth-wrap">
       <div className="auth-brand">
-        <div className="mk">{APP_NAME}</div>
+        <img src="/tightpunt-logo.svg" alt={APP_NAME} className="auth-logo" />
         <div className="tag">{APP_TAGLINE}</div>
       </div>
 

@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// VBS — global config. Tweak these and the whole app follows.
+// TightPunt — global config. Tweak these and the whole app follows.
 // ---------------------------------------------------------------------------
 
-export const APP_NAME = 'VBS'
+export const APP_NAME = 'TightPunt'
 export const APP_TAGLINE = 'The group chat bookmaker'
 
 // Currency symbol is configurable per the brief. British bookie by default.

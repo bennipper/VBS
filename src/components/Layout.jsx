@@ -21,10 +21,8 @@ export default function Layout({ children }) {
     <div className="app">
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/" className="wordmark">
-            <span className="tick">▪</span>
-            {APP_NAME}
-            <small>bookmaker</small>
+          <Link to="/" className="wordmark" aria-label={APP_NAME}>
+            <img src="/tightpunt-logo.svg" alt={APP_NAME} className="logo" />
           </Link>
           <Link to="/me" className="bal-pill tnum" title="Your balance">
             <Avatar url={profile?.avatar_url} emoji={profile?.avatar_emoji} size={18} />
