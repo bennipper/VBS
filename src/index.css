@@ -168,9 +168,9 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   font-weight: 600;
   color: var(--paper-faint);
 }
-.navitem .ico { font-size: 19px; line-height: 1; }
+.navitem .ico { font-size: 19px; line-height: 1; display: flex; }
+.navitem .ico svg { display: block; }
 .navitem.active { color: var(--brand); }
-.navitem.active .ico { filter: none; }
 
 /* ---- Sections & headings ------------------------------------------------- */
 

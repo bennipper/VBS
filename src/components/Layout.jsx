@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { APP_NAME } from '../config.js'
 import { money } from '../lib/format.js'
 import Avatar from './Avatar.jsx'
+import Icon from './Icon.jsx'
 
 function NavItem({ to, ico, label, end }) {
   return (
@@ -38,10 +39,10 @@ export default function Layout({ children }) {
 
       <nav className="bottomnav">
         <div className="bottomnav-inner">
-          <NavItem to="/" ico="📋" label="Markets" end />
-          <NavItem to="/leaderboard" ico="🏆" label="Table" />
-          <NavItem to="/create" ico="➕" label="New" />
-          <NavItem to="/me" ico="👤" label="You" />
+          <NavItem to="/" ico={<Icon name="market" />} label="Markets" end />
+          <NavItem to="/leaderboard" ico={<Icon name="table" />} label="Table" />
+          <NavItem to="/create" ico={<Icon name="plus" />} label="New" />
+          <NavItem to="/me" ico={<Icon name="you" />} label="You" />
         </div>
       </nav>
     </div>
