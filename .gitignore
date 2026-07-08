@@ -9,6 +9,9 @@ dist-ssr
 *.log
 .vercel
 
+# Design export for Figma import — not part of the app
+design/
+
 # Local tooling / installed agent skills — not part of the app
 .agents/
 .claude/skills/

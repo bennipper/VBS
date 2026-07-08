@@ -6,29 +6,34 @@
    ========================================================================== */
 
 :root {
-  /* Ink & paper */
-  --ink: #0f0f0e;
-  --ink-2: #171715;
-  --card: #1b1b18;
-  --line: #2c2c27;
-  --line-2: #3a3a33;
-  --paper: #ece7da;      /* primary text */
-  --paper-dim: #a8a294;  /* secondary text */
-  --paper-faint: #6f6a5e;
+  /* Ink & surfaces — cool near-black (Figma "Betting App" colour system) */
+  --ink: #0d0d12;        /* Base — page background */
+  --ink-2: #191926;      /* Input */
+  --card: #1a1a24;       /* Surface — cards */
+  --elevated: #24243a;   /* Elevated — raised surfaces */
+  --line: #2e2e48;       /* Border */
+  --line-2: #3d3d55;     /* stronger border / disabled */
+  --paper: #ffffff;      /* Text — primary */
+  --paper-dim: #b0b0c8;  /* Text — secondary */
+  --paper-faint: #6b6b8a;/* Text — tertiary */
 
-  /* Brand — pink. Used for chrome: wordmark, primary actions, active states. */
-  --brand: #f56aaf;
-  --brand-strong: #f03f95;
-  --brand-ink: #2a1420;
-  --brand-soft: #3a1c2c;
+  /* Brand — pink */
+  --brand: #f56aaf;        /* Primary / Pulse */
+  --brand-strong: #c44a8a; /* Primary Dark */
+  --brand-light: #f891c6;  /* Primary Light */
+  --brand-ink: #2a1526;    /* dark pink tint */
+  --brand-soft: #3a1c33;
 
-  /* Semantic betting accents (kept — red/green read as lose/win everywhere) */
-  --red: #d21f3c;        /* NO, losses, danger */
-  --green: #3fa34d;      /* YES, wins, money up */
-  --red-ink: #2a1418;
-  --green-ink: #14210f;
+  /* Semantic betting accents */
+  --red: #ef4444;        /* NO, losses, danger */
+  --green: #22c55e;      /* YES, wins, money up */
+  --red-ink: #2d0a0a;    /* Red subtle */
+  --green-ink: #052e16;  /* Green subtle */
+  --red-strong: #b91c1c;
+  --green-strong: #15803d;
 
-  --gold: #d9b45b;
+  --gold: #f59e0b;       /* Gold */
+  --gold-ink: #2d1a00;   /* Gold subtle */
 
   --radius: 10px;
   --radius-sm: 7px;
@@ -553,7 +558,7 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .pcard .pcard-r { font-size: 20px; font-weight: 700; line-height: 1; }
 .pcard .pcard-s { font-size: 18px; line-height: 1; margin-top: 2px; }
 .pcard.back {
-  background: repeating-linear-gradient(45deg, var(--brand-soft), var(--brand-soft) 6px, #241019 6px, #241019 12px);
+  background: repeating-linear-gradient(45deg, var(--brand-soft), var(--brand-soft) 6px, #241028 6px, #241028 12px);
   border: 1px solid var(--brand);
 }
 .bj-result { text-align: center; font-weight: 700; font-size: 16px; padding: 2px 0; }
