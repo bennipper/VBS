@@ -31,7 +31,7 @@ export default function MarketCard({ m }) {
       </div>
 
       <div className="card-body">
-        <ProbNumber prob={prob} size="lg" label="YES" />
+        <ProbNumber prob={prob} size="lg" />
         <div className="quickbet" onClick={(e) => e.stopPropagation()}>
           <button className="qb qb-yes" onClick={() => go('YES')}>
             <span className="side">YES</span>

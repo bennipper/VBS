@@ -166,7 +166,7 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--paper-faint);
+  color: #3d3d55;
 }
 .navitem .ico { font-size: 19px; line-height: 1; display: flex; }
 .navitem .ico svg { display: block; }
@@ -498,8 +498,8 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   font-weight: 800; font-size: 42px; letter-spacing: -0.02em; line-height: 1.05;
 }
 .pl-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
-.pl-pill.up { background: var(--green-ink); color: var(--green); }
-.pl-pill.down { background: var(--red-ink); color: var(--red); }
+.pl-pill.up { background: var(--green); color: #06210b; }
+.pl-pill.down { background: var(--red); color: #fff; }
 .pl-pill.flat { background: var(--ink-2); color: var(--paper-dim); }
 .hero-actions { margin-left: auto; display: flex; gap: 8px; }
 .hero-btn { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--paper); background: var(--ink-2); transition: transform 0.05s ease; }
