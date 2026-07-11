@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useRoom } from '../context/RoomContext.jsx'
 import { seedPools } from '../lib/cpmm.js'
 import { SEED_LIQUIDITY, CATEGORIES, CATEGORY_EMOJI, DEFAULT_CATEGORY } from '../config.js'
 
 export default function CreateMarket() {
   const { user } = useAuth()
+  const { activeRoomId, activeRoom } = useRoom()
   const navigate = useNavigate()
   const [question, setQuestion] = useState('')
   const [description, setDescription] = useState('')
@@ -35,6 +37,7 @@ export default function CreateMarket() {
         question: q,
         description: description.trim() || null,
         category,
+        room_id: activeRoomId,
         pool_yes: poolYes,
         pool_no: poolNo,
         closes_at: closesAt ? new Date(closesAt).toISOString() : null,
@@ -50,10 +53,23 @@ export default function CreateMarket() {
     navigate(`/market/${data.id}`)
   }
 
+  if (!activeRoomId) {
+    return (
+      <div className="empty" style={{ paddingTop: 60 }}>
+        <div className="big">🚪</div>
+        <p>Markets live in rooms. Join or make one first.</p>
+        <Link to="/rooms" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
+          Go to rooms
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="section-head">
         <h2>Open a market</h2>
+        <span className="faint" style={{ fontSize: 12 }}>in {activeRoom?.name}</span>
       </div>
 
       <form className="card stack" onSubmit={submit}>

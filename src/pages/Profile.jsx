@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useRoom } from '../context/RoomContext.jsx'
 import { money, signedMoney, priceLabel, relTime } from '../lib/format.js'
 import { BAILOUT_THRESHOLD, BAILOUT_AMOUNT, AVATAR_BUCKET, AVATAR_MAX_BYTES } from '../config.js'
 import Avatar from '../components/Avatar.jsx'
@@ -49,10 +50,12 @@ function computeStats(bets) {
 export default function Profile() {
   const { id: routeId } = useParams()
   const { user, profile: myProfile, refreshProfile } = useAuth()
+  const { activeRoomId, activeRoom, refreshRooms } = useRoom()
   const targetId = routeId ?? user?.id
   const isMe = targetId === user?.id
 
   const [profile, setProfile] = useState(null)
+  const [membership, setMembership] = useState(null) // target's row in the active room
   const [bets, setBets] = useState([])
   const [txns, setTxns] = useState([])
   const [marketsCreated, setMarketsCreated] = useState(0)
@@ -64,22 +67,31 @@ export default function Profile() {
   const [uploadErr, setUploadErr] = useState('')
 
   const load = useCallback(async () => {
-    const [{ data: p }, { data: b }, { data: tx }, { count }] = await Promise.all([
+    // Everything money-ish is scoped to the active room; identity is global.
+    const [{ data: p }, { data: mem }, { data: b }, { data: tx }, { count }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', targetId).maybeSingle(),
+      activeRoomId
+        ? supabase.from('room_members').select('balance, bailout_count').eq('room_id', activeRoomId).eq('user_id', targetId).maybeSingle()
+        : Promise.resolve({ data: null }),
       supabase
         .from('bets')
-        .select('*, market:markets!market_id(question, resolved_outcome, resolved_at)')
+        .select('*, market:markets!market_id(question, resolved_outcome, resolved_at, room_id)')
         .eq('user_id', targetId)
         .order('created_at', { ascending: false }),
-      supabase.from('transactions').select('type, amount, created_at').eq('user_id', targetId),
-      supabase.from('markets').select('id', { count: 'exact', head: true }).eq('creator_id', targetId),
+      activeRoomId
+        ? supabase.from('transactions').select('type, amount, created_at').eq('user_id', targetId).eq('room_id', activeRoomId)
+        : Promise.resolve({ data: [] }),
+      activeRoomId
+        ? supabase.from('markets').select('id', { count: 'exact', head: true }).eq('creator_id', targetId).eq('room_id', activeRoomId)
+        : Promise.resolve({ count: 0 }),
     ])
     setProfile(p ?? null)
-    setBets(b ?? [])
+    setMembership(mem ?? null)
+    setBets((b ?? []).filter((bet) => bet.market?.room_id === activeRoomId))
     setTxns(tx ?? [])
     setMarketsCreated(count ?? 0)
     setLoading(false)
-  }, [targetId])
+  }, [targetId, activeRoomId])
 
   useEffect(() => {
     setLoading(true)
@@ -131,13 +143,13 @@ export default function Profile() {
   async function claimBailout() {
     setBailoutError('')
     setBailoutBusy(true)
-    const { error } = await supabase.rpc('claim_bailout')
+    const { error } = await supabase.rpc('claim_bailout', { p_room_id: activeRoomId })
     setBailoutBusy(false)
     if (error) {
       setBailoutError(error.message)
       return
     }
-    refreshProfile()
+    refreshRooms()
     load()
   }
 
@@ -155,19 +167,22 @@ export default function Profile() {
   const stats = computeStats(bets)
   const pl = plFromTransactions(txns)
   const rakeEarned = txns.reduce((a, t) => (t.type === 'rake' ? a + Number(t.amount) : a), 0)
-  const achievements = computeAchievements({ bets, profile: shownProfile, marketsCreated, rakeEarned })
-  const balance = Number(shownProfile.balance)
-  const canBailout = isMe && balance < BAILOUT_THRESHOLD
+  const bailoutCount = membership?.bailout_count ?? 0
+  const achievements = computeAchievements({
+    bets,
+    profile: { ...shownProfile, bailout_count: bailoutCount },
+    marketsCreated,
+    rakeEarned,
+  })
+  const inRoom = membership != null
+  const balance = Number(membership?.balance ?? 0)
+  const canBailout = isMe && inRoom && balance < BAILOUT_THRESHOLD
 
   return (
     <>
       <div className="section-head">
         <h2>{isMe ? 'Your book' : 'Punter'}</h2>
-        {isMe && (
-          <button className="faint" style={{ fontSize: 13 }} onClick={() => refreshProfile()}>
-            refresh
-          </button>
-        )}
+        {activeRoom && <span className="faint" style={{ fontSize: 12 }}>in {activeRoom.name}</span>}
       </div>
 
       {/* Identity + balance */}
@@ -197,7 +212,7 @@ export default function Profile() {
             <div style={{ fontSize: 20, fontWeight: 700 }}>{shownProfile.username}</div>
             <div className="faint" style={{ fontSize: 12.5 }}>
               joined {relTime(shownProfile.created_at)}
-              {shownProfile.bailout_count > 0 && ` · bailed out ${shownProfile.bailout_count}×`}
+              {bailoutCount > 0 && ` · bailed out ${bailoutCount}×`}
             </div>
           </div>
         </div>
@@ -205,12 +220,18 @@ export default function Profile() {
         {isMe && uploadErr && <div className="error-box" style={{ marginTop: 12 }}>{uploadErr}</div>}
 
         <hr className="divider" />
-        <div className="row-between">
-          <span className="prob-label">Balance</span>
-          <span className="tnum" style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-num)' }}>
-            {money(balance)}
-          </span>
-        </div>
+        {inRoom ? (
+          <div className="row-between">
+            <span className="prob-label">Balance{activeRoom ? ` · ${activeRoom.name}` : ''}</span>
+            <span className="tnum" style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-num)' }}>
+              {money(balance)}
+            </span>
+          </div>
+        ) : (
+          <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+            Not a member of {activeRoom?.name ?? 'this room'}.
+          </p>
+        )}
 
         {canBailout && (
           <>

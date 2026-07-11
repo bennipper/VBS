@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useLocation, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useRoom } from '../context/RoomContext.jsx'
 import ProbNumber from '../components/ProbNumber.jsx'
 import ProbChart from '../components/ProbChart.jsx'
 import BetSlip from '../components/BetSlip.jsx'
@@ -17,11 +18,14 @@ function Outcome({ outcome }) {
 
 export default function MarketDetail() {
   const { id } = useParams()
-  const { user, profile, refreshProfile } = useAuth()
+  const { user } = useAuth()
+  const { refreshRooms } = useRoom()
   const location = useLocation()
   const navigate = useNavigate()
 
   const [market, setMarket] = useState(null)
+  const [roomHost, setRoomHost] = useState(null)
+  const [myBalance, setMyBalance] = useState(0)
   const [bets, setBets] = useState([]) // chronological asc
   const [reactions, setReactions] = useState([]) // [{ bet_id, user_id, emoji }]
   const [loading, setLoading] = useState(true)
@@ -35,7 +39,18 @@ export default function MarketDetail() {
   const loadMarket = useCallback(async () => {
     const { data } = await supabase.from('market_summary').select('*').eq('id', id).maybeSingle()
     setMarket(data ?? null)
-  }, [id])
+    if (data?.room_id) {
+      // Host of the market's room can also resolve; balance is per-room.
+      const [{ data: room }, { data: me }] = await Promise.all([
+        supabase.from('rooms').select('host_id').eq('id', data.room_id).maybeSingle(),
+        user
+          ? supabase.from('room_members').select('balance').eq('room_id', data.room_id).eq('user_id', user.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      setRoomHost(room?.host_id ?? null)
+      setMyBalance(Number(me?.balance ?? 0))
+    }
+  }, [id, user])
 
   const loadBets = useCallback(async () => {
     const { data } = await supabase
@@ -118,6 +133,7 @@ export default function MarketDetail() {
   const poolNo = Number(market.pool_no)
   const prob = probYes(poolYes, poolNo)
   const isCreator = user?.id === market.creator_id
+  const canResolve = isCreator || user?.id === roomHost
   const isResolved = Boolean(market.resolved_at)
   const closed = market.closes_at && new Date(market.closes_at) <= new Date()
   const canBet = !isResolved && !closed
@@ -153,7 +169,7 @@ export default function MarketDetail() {
       setCashoutError(error.message)
       return
     }
-    refreshProfile()
+    refreshRooms()
     loadMarket()
     loadBets()
   }
@@ -275,7 +291,7 @@ export default function MarketDetail() {
           market={market}
           poolYes={poolYes}
           poolNo={poolNo}
-          balance={Number(profile?.balance ?? 0)}
+          balance={myBalance}
           initialSide={location.state?.side}
           onPlaced={() => {
             loadMarket()
@@ -294,7 +310,7 @@ export default function MarketDetail() {
       )}
 
       {/* Resolve panel — creator only */}
-      {isCreator && !isResolved && (
+      {canResolve && !isResolved && (
         <>
           <div className="section-head"><h2>Resolve · your market</h2></div>
           <div className="card stack">

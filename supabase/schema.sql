@@ -911,3 +911,64 @@ revoke execute on function public.get_daily() from public, anon;
 revoke execute on function public.pick_daily(uuid, text) from public, anon;
 grant execute on function public.get_daily() to authenticated;
 grant execute on function public.pick_daily(uuid, text) to authenticated;
+
+
+-- ============================================================================
+-- V5 · Rooms — private multi-tenancy.
+-- (Applied live as migration vbs_v5_rooms_multitenancy; full RPC bodies there.)
+-- Every market lives in exactly ONE room. Balances + bailout counts are PER
+-- ROOM (room_members). Visibility is members-only via RLS. The Daily (V4) was
+-- REMOVED here — its tables/functions are dropped, open picks refunded.
+-- profiles.balance / profiles.bailout_count are frozen legacy columns.
+-- ============================================================================
+
+create table if not exists public.rooms (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 3 and 40),
+  code text unique not null check (code ~ '^[0-9]{8}$'),   -- 8-digit invite code
+  host_id uuid not null references public.profiles on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.room_members (
+  room_id uuid not null references public.rooms on delete cascade,
+  user_id uuid not null references public.profiles on delete cascade,
+  balance numeric not null default 1000 check (balance >= 0),
+  bailout_count int not null default 0,
+  joined_at timestamptz not null default now(),
+  primary key (room_id, user_id)
+);
+create index if not exists room_members_user_idx on public.room_members (user_id);
+
+alter table public.markets add column if not exists room_id uuid not null references public.rooms;
+alter table public.transactions add column if not exists room_id uuid not null references public.rooms;
+create index if not exists markets_room_idx on public.markets (room_id, created_at desc);
+create index if not exists tx_room_idx on public.transactions (room_id, created_at desc);
+
+-- The Daily removed:
+drop function if exists public.get_daily();
+drop function if exists public.pick_daily(uuid, text);
+drop function if exists public.resolve_daily_question(uuid);
+drop function if exists public.ensure_daily_question();
+drop table if exists public.daily_picks;
+drop table if exists public.daily_questions;
+
+-- RLS helpers (SECURITY DEFINER so membership policies don't recurse):
+--   is_room_member(room)  · market_room(market)  · bet_room(bet)
+-- Policies: rooms / room_members / markets / bets / transactions /
+-- bet_reactions are all readable ONLY by members of the relevant room
+-- (public-read policies from V1 are dropped). profiles stay public-read —
+-- usernames/avatars are global identity.
+
+-- Room RPCs (SECURITY DEFINER, authenticated-only):
+--   create_room(name)  — unique 8-digit code, host joins with £1,000
+--   join_room(code)    — idempotent join with £1,000 starting balance
+-- Money RPCs (place_bet / sell_position / resolve_market) are room-scoped:
+-- they lock the bettor's room_members row, rake goes to the creator's
+-- membership in the same room, and payouts credit room balances.
+-- resolve_market also allows the ROOM HOST (backup resolver).
+-- claim_bailout(room_id) is per room.
+
+-- Realtime: room_members is in the supabase_realtime publication.
+-- market_summary / activity_feed views expose room_id (security_invoker, so
+-- the membership RLS applies to them automatically).

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useRoom } from '../context/RoomContext.jsx'
 import MarketCard from '../components/MarketCard.jsx'
 import ActivityTicker from '../components/ActivityTicker.jsx'
 import { probYes } from '../lib/cpmm.js'
@@ -28,10 +29,11 @@ function sortMarkets(list, sort) {
 }
 
 export default function Feed() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
+  const { activeRoomId, activeRoom, balance, loading: roomsLoading, rooms } = useRoom()
   const [markets, setMarkets] = useState([])
   const [pl, setPl] = useState(0)
-  const [tab, setTab] = useState('open') // 'open' | 'resolved'
+  const [tab, setTab] = useState('open')
   const [category, setCategory] = useState('All')
   const [sort, setSort] = useState('newest')
   const [sortOpen, setSortOpen] = useState(false)
@@ -39,35 +41,50 @@ export default function Feed() {
   const sortRef = useRef(null)
 
   const load = useCallback(async () => {
+    if (!activeRoomId) {
+      setMarkets([])
+      setLoading(false)
+      return
+    }
     const { data } = await supabase
       .from('market_summary')
       .select('*')
+      .eq('room_id', activeRoomId)
       .order('created_at', { ascending: false })
     setMarkets(data ?? [])
     setLoading(false)
-  }, [])
+  }, [activeRoomId])
 
   const loadPL = useCallback(async () => {
-    if (!user) return
-    const { data } = await supabase.from('transactions').select('type, amount').eq('user_id', user.id)
+    if (!user || !activeRoomId) {
+      setPl(0)
+      return
+    }
+    const { data } = await supabase
+      .from('transactions')
+      .select('type, amount')
+      .eq('user_id', user.id)
+      .eq('room_id', activeRoomId)
     setPl((data ?? []).reduce((a, t) => (PL_TYPES.has(t.type) ? a + Number(t.amount) : a), 0))
-  }, [user])
+  }, [user, activeRoomId])
 
   useEffect(() => {
+    setLoading(true)
     load()
     loadPL()
   }, [load, loadPL])
 
   useEffect(() => {
+    if (!activeRoomId) return
     const channel = supabase
-      .channel('feed')
+      .channel(`feed-${activeRoomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'markets' }, load)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bets' }, () => { load(); loadPL() })
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [load, loadPL])
+  }, [activeRoomId, load, loadPL])
 
   useEffect(() => {
     if (!sortOpen) return
@@ -88,20 +105,35 @@ export default function Feed() {
   const sortLabel = SORT_OPTIONS.find((s) => s.key === sort)?.label ?? 'Sort'
   const plState = pl > 0 ? 'up' : pl < 0 ? 'down' : 'flat'
 
+  // No room yet: onboard to the Rooms page.
+  if (!roomsLoading && rooms.length === 0) {
+    return (
+      <div className="empty" style={{ paddingTop: 80 }}>
+        <div className="big">🚪</div>
+        <p>Welcome to {APP_NAME}.<br />Betting happens in rooms — private groups of mates.</p>
+        <Link to="/rooms" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
+          Make or join a room
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Balance hero */}
       <div className="balance-hero">
-        <div className="lbl">Available balance</div>
+        <div className="lbl">
+          Available balance{activeRoom && <span className="hero-room"> · {activeRoom.name}</span>}
+        </div>
         <div className="amt-row">
-          <div className="amt">{money(profile?.balance ?? 0)}</div>
-          <span className={`pl-pill ${plState}`} title="All-time P/L">
+          <div className="amt">{money(balance)}</div>
+          <span className={`pl-pill ${plState}`} title="Your P/L in this room">
             {pl > 0 ? '↑' : pl < 0 ? '↓' : '·'} {signedMoney(pl)}
           </span>
         </div>
       </div>
 
-      <ActivityTicker />
+      <ActivityTicker roomId={activeRoomId} />
 
       {/* Category chips */}
       <div className="cat-scroll">
@@ -148,13 +180,13 @@ export default function Feed() {
           {tab === 'open' ? (
             category === 'All' ? (
               <>
-                <p>No markets open. The book is bare.</p>
+                <p>No markets open in {activeRoom?.name ?? 'this room'}. The book is bare.</p>
                 <Link to="/create" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
                   Open the first market
                 </Link>
               </>
             ) : (
-              <p>No open {category} markets. Fancy making one?</p>
+              <p>No open {category} markets here. Fancy making one?</p>
             )
           ) : (
             <p>Nothing settled here yet.</p>

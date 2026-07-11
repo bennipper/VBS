@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useRoom } from '../context/RoomContext.jsx'
 import { signedMoney } from '../lib/format.js'
 import Avatar from '../components/Avatar.jsx'
 
@@ -24,31 +25,44 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export default function Leaderboard() {
   const { user } = useAuth()
-  const [profiles, setProfiles] = useState([])
+  const { activeRoomId, activeRoom } = useRoom()
+  const [members, setMembers] = useState([])
   const [txns, setTxns] = useState([])
-  const [tab, setTab] = useState('alltime') // 'alltime' | 'month'
+  const [tab, setTab] = useState('alltime')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: p }, { data: t }] = await Promise.all([
-        supabase.from('profiles').select('id, username, avatar_emoji, avatar_url, bailout_count'),
-        supabase.from('transactions').select('user_id, type, amount, created_at'),
+      if (!activeRoomId) {
+        setMembers([])
+        setTxns([])
+        setLoading(false)
+        return
+      }
+      const [{ data: m }, { data: t }] = await Promise.all([
+        supabase
+          .from('room_members')
+          .select('user_id, bailout_count, profile:profiles(id, username, avatar_emoji, avatar_url)')
+          .eq('room_id', activeRoomId),
+        supabase
+          .from('transactions')
+          .select('user_id, type, amount, created_at')
+          .eq('room_id', activeRoomId),
       ])
-      setProfiles(p ?? [])
+      setMembers(m ?? [])
       setTxns(t ?? [])
       setLoading(false)
     }
+    setLoading(true)
     load()
-  }, [])
+  }, [activeRoomId])
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
   const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
 
-  // Previous full month's champion — the trophy of shame's opposite.
   const champ = useMemo(() => {
-    if (profiles.length === 0) return null
+    if (members.length === 0) return null
     const pl = plByUser(txns, prevStart, monthStart)
     let best = null
     for (const [uid, val] of pl) {
@@ -56,23 +70,43 @@ export default function Leaderboard() {
       if (!best || val > best.val) best = { uid, val }
     }
     if (!best) return null
-    const prof = profiles.find((p) => p.id === best.uid)
-    if (!prof) return null
+    const mem = members.find((m) => m.user_id === best.uid)
+    if (!mem?.profile) return null
     const d = new Date(prevStart)
-    return { ...prof, val: best.val, month: MONTHS[d.getMonth()] }
-  }, [txns, profiles, prevStart, monthStart])
+    return { ...mem.profile, val: best.val, month: MONTHS[d.getMonth()] }
+  }, [txns, members, prevStart, monthStart])
 
   const rows = useMemo(() => {
     const pl = tab === 'month' ? plByUser(txns, monthStart, null) : plByUser(txns, null, null)
-    return profiles
-      .map((p) => ({ ...p, pl: pl.get(p.id) ?? 0 }))
+    return members
+      .filter((m) => m.profile)
+      .map((m) => ({
+        id: m.user_id,
+        username: m.profile.username,
+        avatar_emoji: m.profile.avatar_emoji,
+        avatar_url: m.profile.avatar_url,
+        bailout_count: m.bailout_count,
+        pl: pl.get(m.user_id) ?? 0,
+      }))
       .sort((a, b) => b.pl - a.pl)
-  }, [profiles, txns, tab, monthStart])
+  }, [members, txns, tab, monthStart])
+
+  if (!activeRoomId) {
+    return (
+      <div className="empty" style={{ paddingTop: 60 }}>
+        <div className="big">🚪</div>
+        <p>Leaderboards live in rooms. Join or make one first.</p>
+        <Link to="/rooms" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
+          Go to rooms
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <>
       <div className="section-head">
-        <h2>The table</h2>
+        <h2>The table · {activeRoom?.name}</h2>
         <div className="tabs">
           <button className={`tab${tab === 'alltime' ? ' active' : ''}`} onClick={() => setTab('alltime')}>
             All-time
@@ -131,7 +165,7 @@ export default function Leaderboard() {
 
       <div className="spacer-lg" />
       <p className="faint center" style={{ fontSize: 12 }}>
-        Ranked by P/L, not balance — bailouts don't buy you a spot.
+        Ranked by P/L in this room, not balance — bailouts don't buy you a spot.
       </p>
     </>
   )

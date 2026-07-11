@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useRoom } from '../context/RoomContext.jsx'
 import { previewBet, probYes } from '../lib/cpmm.js'
 import { money, priceLabel, pct, shares as fmtShares } from '../lib/format.js'
 import { QUICK_CHIPS } from '../config.js'
 
 export default function BetSlip({ market, poolYes, poolNo, balance, initialSide, onPlaced }) {
-  const { refreshProfile } = useAuth()
+  const { refreshRooms } = useRoom()
   const [side, setSide] = useState(initialSide === 'NO' ? 'NO' : 'YES')
   const [amount, setAmount] = useState('')
   const [chip, setChip] = useState(null)
@@ -50,7 +50,7 @@ export default function BetSlip({ market, poolYes, poolNo, balance, initialSide,
     }
     setAmount('')
     setChip(null)
-    refreshProfile()
+    refreshRooms()
     onPlaced?.()
   }
 

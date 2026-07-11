@@ -37,18 +37,23 @@ function itemNode(a) {
   )
 }
 
-export default function ActivityTicker() {
+export default function ActivityTicker({ roomId }) {
   const [items, setItems] = useState([])
   const navigate = useNavigate()
 
   const load = useCallback(async () => {
+    if (!roomId) {
+      setItems([])
+      return
+    }
     const { data } = await supabase
       .from('activity_feed')
       .select('*')
+      .eq('room_id', roomId)
       .order('created_at', { ascending: false })
       .limit(14)
     setItems(data ?? [])
-  }, [])
+  }, [roomId])
 
   useEffect(() => {
     load()
