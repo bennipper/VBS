@@ -33,18 +33,19 @@ Live on Vercel · backend on Supabase · built with Vite + React.
 - Polymarket-style **category filter chips** + sort (newest / oldest / most
   bet / highest / lowest odds).
 
-### 🗓️ The Daily
-One shared question per (London) day about the group's own activity —
-*"Will £300 or more be staked today?"*, *"Will anyone claim a bailout?"*,
-*"Will \<random member\> place a punt today?"*.
+### 🚪 Rooms (private groups)
+Betting happens in **rooms** — invite-only groups with their own economy:
 
-- £10 stake, one locked pick, **winners split the pot**; if nobody calls it,
-  the house keeps the money.
-- Questions **auto-resolve from the app's own data** at midnight — no judge,
-  no cron. The first page load of the day settles yesterday and generates
-  today (lazy housekeeping inside `get_daily()`).
-- Picks are hidden until settlement (no copying); participants are visible.
-- 🔥 **Pick-streak** tracking.
+- Anyone can **make a room** (they become the host) and invite mates via a
+  **copy-able invite link** or a **shareable 8-digit code** typed into the
+  app.
+- **Per-room everything**: you get a fresh £1,000 in every room you join, and
+  balances, bailouts, P/L, and the leaderboard are scoped to that room.
+- **Members-only visibility** — markets, bets, and reactions in a room are
+  invisible to non-members, enforced by row-level security.
+- The Rooms page lists all your rooms; tapping one switches your whole
+  dashboard to it. `/join/<code>` deep links survive signup.
+- Hosts can also resolve abandoned markets in their room.
 
 ### 💬 Social layer
 - **Emoji reactions on punts** (WhatsApp-style long-press picker), live via
@@ -97,8 +98,8 @@ mates hammering buttons simultaneously can't corrupt state or overspend:
 | `place_bet(market, side, amount)` | balance check → CPMM math → 2% margin (half to creator, half burned) → pools + bet + ledger |
 | `sell_position(market, side, shares)` | cash out open shares at the current price, retire them FIFO |
 | `resolve_market(market, outcome)` | creator-only; pays £1 × open shares to winners (VOID refunds unsold stake) |
-| `claim_bailout()` | only below £50; +£1,000 and +1 to your public shame counter |
-| `get_daily()` / `pick_daily(q, side)` | The Daily: lazy settle/generate; stake + locked pick |
+| `claim_bailout(room)` | only below £50; +£1,000 in that room and +1 to your shame counter |
+| `create_room(name)` / `join_room(code)` | unique 8-digit invite code; joiners start with £1,000 |
 
 RLS: everyone can **read** everything (transparency is the fun); direct writes
 to balances, bets, pools, and picks are denied. A guard trigger blocks balance
@@ -178,7 +179,8 @@ symbol (£), categories, reaction emojis, quick chips.
 | **V2 · Phase 2** | Cash-out (sell positions), 2% creator rake + burn, ledger-based P/L, badges, monthly form table + Punter of the Month |
 | **Redesign** | TightPunt rebrand (logo + name), pink `#F56AAF` system, cool near-black palette from Figma, Space Grotesk, category filters + sort, icons-only nav |
 | **V3** | Casino (slots + blackjack, server-side RNG) — *killed: solo play vs the house had no social loop* |
-| **V4** | **The Daily** replaces the casino: shared auto-resolving daily question, pot splitting, streaks |
+| **V4** | **The Daily** replaces the casino: shared auto-resolving daily question, pot splitting, streaks — *later removed in V5* |
+| **V5** | **Rooms**: private multi-tenancy — invite links + 8-digit codes, per-room balances/leaderboards, members-only RLS; existing game migrated into "The OG Room" |
 
 ## Roadmap
 
