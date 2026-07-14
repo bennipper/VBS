@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useRoom } from '../context/RoomContext.jsx'
-import { money } from '../lib/format.js'
+import { money, roomCode } from '../lib/format.js'
+import Avatar from '../components/Avatar.jsx'
+import RoomHostPanel from '../components/RoomHostPanel.jsx'
 
 function inviteLink(code) {
   return `${window.location.origin}/join/${code}`
@@ -31,6 +33,7 @@ export default function Rooms() {
   const [err, setErr] = useState('')
   const [notice, setNotice] = useState('')
   const [copiedCode, setCopiedCode] = useState(null)
+  const [panelRoomId, setPanelRoomId] = useState(null) // open host panel
 
   // Member counts for my rooms (RLS: co-members are visible).
   useEffect(() => {
@@ -48,6 +51,15 @@ export default function Rooms() {
   function openRoom(id) {
     setActiveRoomId(id)
     navigate('/')
+  }
+
+  async function handleDeleted(deletedId) {
+    setPanelRoomId(null)
+    setNotice('Room deleted.')
+    const list = await refreshRooms()
+    if (activeRoomId === deletedId) {
+      setActiveRoomId(list.find((r) => r.room_id !== deletedId)?.room_id ?? null)
+    }
   }
 
   async function createRoom(e) {
@@ -69,8 +81,8 @@ export default function Rooms() {
     const ok = await copyText(inviteLink(data.code))
     setNotice(
       ok
-        ? `Room made — code ${data.code}. Invite link copied, send it to the group chat.`
-        : `Room made — code ${data.code}. Share the code or the invite link below.`
+        ? `Room made — code ${roomCode(data.code)}. Invite link copied, send it to the group chat.`
+        : `Room made — code ${roomCode(data.code)}. Share the code or the invite link below.`
     )
   }
 
@@ -130,23 +142,39 @@ export default function Rooms() {
                 role="button"
               >
                 <div className="row-between">
-                  <div>
-                    <div className="room-name">
-                      {r.room?.name}
-                      {isHost && <span className="badge" style={{ marginLeft: 8 }}>host</span>}
-                      {isActive && <span className="badge badge-yes" style={{ marginLeft: 6 }}>active</span>}
-                    </div>
-                    <div className="faint" style={{ fontSize: 12.5, marginTop: 3 }}>
-                      {memberCounts[r.room_id] ?? '…'} punters · code <span className="tnum">{r.room?.code}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <Avatar url={r.room?.avatar_url} emoji="🚪" size={44} className="room-av" />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="room-name">
+                        {r.room?.name}
+                        {isHost && <span className="badge" style={{ marginLeft: 8 }}>host</span>}
+                        {isActive && <span className="badge badge-yes" style={{ marginLeft: 6 }}>active</span>}
+                      </div>
+                      <div className="faint" style={{ fontSize: 12.5, marginTop: 3 }}>
+                        {memberCounts[r.room_id] ?? '…'} punters · code <span className="tnum">{roomCode(r.room?.code)}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="tnum room-bal">{money(Number(r.balance), { compact: true })}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <div className="tnum room-bal">{money(Number(r.balance), { compact: true })}</div>
+                    {isHost && (
+                      <button
+                        className="room-dots"
+                        title="Host controls"
+                        onClick={(e) => { e.stopPropagation(); setPanelRoomId(panelRoomId === r.room_id ? null : r.room_id) }}
+                      >
+                        ⋯
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="room-actions" onClick={(e) => e.stopPropagation()}>
                   <button className="btn btn-ghost btn-sm" onClick={() => copyInvite(r.room?.code)}>
                     {copiedCode === r.room?.code ? '✓ Link copied' : '🔗 Copy invite link'}
                   </button>
-                  {!isActive && (
+                  {isActive ? (
+                    <button className="btn btn-sm btn-joined" disabled>✓ Joined</button>
+                  ) : (
                     <button className="btn btn-primary btn-sm" onClick={() => openRoom(r.room_id)}>
                       Enter
                     </button>
@@ -157,6 +185,23 @@ export default function Rooms() {
           })}
         </div>
       )}
+
+      {/* Host controls modal */}
+      {panelRoomId && (() => {
+        const r = rooms.find((x) => x.room_id === panelRoomId)
+        if (!r) return null
+        return (
+          <div className="modal-backdrop" onClick={() => setPanelRoomId(null)}>
+            <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-head">
+                <h3>Host controls · {r.room?.name}</h3>
+                <button className="modal-close" onClick={() => setPanelRoomId(null)} aria-label="Close">✕</button>
+              </div>
+              <RoomHostPanel room={r.room} onChanged={refreshRooms} onDeleted={handleDeleted} />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Create */}
       <div className="section-head"><h2>Make a room</h2></div>
@@ -198,9 +243,9 @@ export default function Rooms() {
             className="input tnum code-input"
             inputMode="numeric"
             autoComplete="off"
-            value={joinCode}
+            value={roomCode(joinCode)}
             onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="12345678"
+            placeholder="0000 0000"
           />
           <div className="hint">The 8-digit code from your mate's room.</div>
         </div>

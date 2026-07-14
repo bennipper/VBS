@@ -61,6 +61,12 @@ export function relTime(iso) {
   return diff >= 0 ? label : `${label} ago`
 }
 
+// Room invite code shown grouped as "1234 5678".
+export function roomCode(code) {
+  const s = String(code ?? '').replace(/\D/g, '')
+  return s.length === 8 ? `${s.slice(0, 4)} ${s.slice(4)}` : s
+}
+
 export function timeLeft(closesAt) {
   if (!closesAt) return null
   const diff = new Date(closesAt).getTime() - Date.now()

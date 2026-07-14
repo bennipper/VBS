@@ -16,32 +16,46 @@ export default function MarketCard({ m }) {
   const { yes, no } = sidePrices(Number(m.pool_yes), Number(m.pool_no))
   const tl = timeLeft(m.closes_at)
 
+  const isResolved = Boolean(m.resolved_at)
+  const outcome = m.resolved_outcome // 'YES' | 'NO' | 'VOID'
+  const oc = (outcome || '').toLowerCase()
+
   const go = (side) =>
     navigate(`/market/${m.id}`, { state: side ? { side } : undefined })
 
   return (
-    <div className="card market-card" onClick={() => go()} role="button">
+    <div
+      className={`card market-card${isResolved ? ` market-settled settled-${oc}` : ''}`}
+      onClick={() => go()}
+      role="button"
+    >
       <div className="q">{m.question}</div>
       <div className="meta">
         {m.category && <span className="cat-pill">{m.category}</span>}
         <span><Avatar url={m.creator_avatar_url} emoji={m.creator_emoji} size={15} /> {m.creator_username}</span>
         <span className="dot">{money(m.volume, { compact: true })} vol</span>
         <span className="dot">{m.bet_count} punt{Number(m.bet_count) === 1 ? '' : 's'}</span>
-        {tl && <span className="dot">{tl === 'closed' ? 'betting closed' : `closes ${tl}`}</span>}
+        {!isResolved && tl && <span className="dot">{tl === 'closed' ? 'betting closed' : `closes ${tl}`}</span>}
       </div>
 
       <div className="card-body">
         <ProbNumber prob={prob} size="lg" />
-        <div className="quickbet" onClick={(e) => e.stopPropagation()}>
-          <button className="qb qb-yes" onClick={() => go('YES')}>
-            <span className="side">YES</span>
-            <span className="price tnum">{priceLabel(yes)}</span>
-          </button>
-          <button className="qb qb-no" onClick={() => go('NO')}>
-            <span className="side">NO</span>
-            <span className="price tnum">{priceLabel(no)}</span>
-          </button>
-        </div>
+        {isResolved ? (
+          <div className={`settled-badge settled-badge-${oc}`}>
+            {outcome === 'VOID' ? 'Void · refunded' : `${outcome} won`}
+          </div>
+        ) : (
+          <div className="quickbet" onClick={(e) => e.stopPropagation()}>
+            <button className="qb qb-yes" onClick={() => go('YES')}>
+              <span className="side">YES</span>
+              <span className="price tnum">{priceLabel(yes)}</span>
+            </button>
+            <button className="qb qb-no" onClick={() => go('NO')}>
+              <span className="side">NO</span>
+              <span className="price tnum">{priceLabel(no)}</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

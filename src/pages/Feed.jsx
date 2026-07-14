@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useRoom } from '../context/RoomContext.jsx'
 import MarketCard from '../components/MarketCard.jsx'
 import ActivityTicker from '../components/ActivityTicker.jsx'
+import EventBanner from '../components/EventBanner.jsx'
 import { probYes } from '../lib/cpmm.js'
 import { money, signedMoney } from '../lib/format.js'
 import { APP_NAME, CATEGORIES, SORT_OPTIONS } from '../config.js'
@@ -93,8 +94,9 @@ export default function Feed() {
     return () => document.removeEventListener('pointerdown', close)
   }, [sortOpen])
 
-  const open = markets.filter((m) => !m.resolved_at)
-  const resolved = markets.filter((m) => m.resolved_at)
+  // Event (house) markets live behind the banner on their own page, not here.
+  const open = markets.filter((m) => !m.resolved_at && !m.event_id)
+  const resolved = markets.filter((m) => m.resolved_at && !m.event_id)
 
   const shown = useMemo(() => {
     let list = tab === 'open' ? open : resolved
@@ -171,6 +173,9 @@ export default function Feed() {
           </div>
         )}
       </div>
+
+      {/* Major-event promo → dedicated event page. First of the lot. */}
+      <EventBanner />
 
       {loading ? (
         <div className="loading-full"><div className="spin" /></div>

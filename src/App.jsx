@@ -11,6 +11,7 @@ import Profile from './pages/Profile.jsx'
 import Leaderboard from './pages/Leaderboard.jsx'
 import Rooms from './pages/Rooms.jsx'
 import JoinRoom from './pages/JoinRoom.jsx'
+import EventPage from './pages/EventPage.jsx'
 import NotConfigured from './components/NotConfigured.jsx'
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Feed />} />
+          <Route path="/event/:slug" element={<EventPage />} />
           <Route path="/market/:id" element={<MarketDetail />} />
           <Route path="/create" element={<CreateMarket />} />
           <Route path="/leaderboard" element={<Leaderboard />} />

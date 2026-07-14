@@ -55,3 +55,23 @@ export const SORT_OPTIONS = [
 // Avatar upload limits.
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 export const AVATAR_BUCKET = 'avatars'
+
+// Flag emoji for event teams (the event banner + event page). Falls back to 🏳️.
+export const TEAM_FLAGS = {
+  England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  Scotland: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  Wales: '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+  Argentina: '🇦🇷',
+  France: '🇫🇷',
+  Brazil: '🇧🇷',
+  Spain: '🇪🇸',
+  Germany: '🇩🇪',
+  Portugal: '🇵🇹',
+  Netherlands: '🇳🇱',
+  Italy: '🇮🇹',
+  USA: '🇺🇸',
+}
+
+export function teamFlag(name) {
+  return TEAM_FLAGS[name] || '🏳️'
+}

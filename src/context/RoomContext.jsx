@@ -29,7 +29,7 @@ export function RoomProvider({ children }) {
     }
     const { data } = await supabase
       .from('room_members')
-      .select('room_id, balance, bailout_count, room:rooms(id, name, code, host_id)')
+      .select('room_id, balance, bailout_count, room:rooms(id, name, code, host_id, avatar_url)')
       .eq('user_id', user.id)
       .order('joined_at', { ascending: true })
     const list = data ?? []

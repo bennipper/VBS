@@ -972,3 +972,268 @@ drop table if exists public.daily_questions;
 -- Realtime: room_members is in the supabase_realtime publication.
 -- market_summary / activity_feed views expose room_id (security_invoker, so
 -- the membership RLS applies to them automatically).
+
+
+-- ============================================================================
+-- V6 · Event markets — ownerless "house" bets for major events.
+-- (Applied live as migrations event_markets_schema + event_markets_house_profile
+-- + seed_england_argentina_event + schedule_event_resolver.)
+--
+-- A "house" profile ('The Bookie') owns event markets. Because place_bet only
+-- pays the creator rake when the creator is a member of the room, and the house
+-- joins no room, event markets are effectively ownerless: the vig just burns and
+-- (as a manual override) the room host can settle. Events are seeded PER ROOM so
+-- each room keeps its own pools/economy. Auto-resolution runs in the
+-- `resolve-events` edge function (see supabase/functions/resolve-events), which
+-- calls admin_settle_market (service_role only).
+-- ============================================================================
+
+-- Fix a latent V5 bug: handle_new_user inserted a room-less signup_bonus tx, but
+-- transactions.room_id is NOT NULL, so every new signup errored. The per-room
+-- bonus is granted in create_room / join_room, so drop the global insert.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+declare uname text; emoji text;
+begin
+  uname := coalesce(nullif(trim(new.raw_user_meta_data->>'username'), ''),
+                    'punter_' || substr(new.id::text, 1, 6));
+  emoji := coalesce(nullif(new.raw_user_meta_data->>'avatar_emoji', ''), '🎲');
+  insert into public.profiles (id, username, avatar_emoji, balance)
+  values (new.id, uname, emoji, 1000);
+  return new;
+end;
+$$;
+
+-- The house profile is created by inserting a non-login auth.users row (username
+-- 'The Bookie' in the metadata → the signup trigger makes the profile), then
+-- zeroing its balance. See migration event_markets_house_profile.
+
+create table if not exists public.events (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  home_team text not null,
+  away_team text not null,
+  subtitle text,
+  kickoff_at timestamptz not null,
+  closes_at timestamptz not null,
+  status text not null default 'upcoming' check (status in ('upcoming','live','settled')),
+  provider text not null default 'apifootball',
+  provider_fixture_id bigint,
+  accent text not null default '#F56AAF',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.event_market_templates (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.events on delete cascade,
+  question text not null,
+  description text,
+  category text not null default 'Sports' check (category in ('Work','Social','Sports','Food','Dares')),
+  seed_yes numeric not null default 300 check (seed_yes > 0),
+  seed_no numeric not null default 300 check (seed_no > 0),
+  resolution_rule jsonb not null,
+  sort_order int not null default 0
+);
+create index if not exists emt_event_idx on public.event_market_templates (event_id, sort_order);
+
+alter table public.markets add column if not exists event_id uuid references public.events on delete set null;
+alter table public.markets add column if not exists template_id uuid references public.event_market_templates on delete set null;
+alter table public.markets add column if not exists resolution_rule jsonb;
+create index if not exists markets_event_idx on public.markets (event_id);
+create unique index if not exists markets_room_template_uidx
+  on public.markets (room_id, template_id) where template_id is not null;
+
+alter table public.events enable row level security;
+alter table public.event_market_templates enable row level security;
+drop policy if exists "read events" on public.events;
+create policy "read events" on public.events for select using (true);
+drop policy if exists "read event templates" on public.event_market_templates;
+create policy "read event templates" on public.event_market_templates for select using (true);
+
+-- market_summary gains event_id / template_id (drop + recreate).
+drop view if exists public.market_summary;
+create view public.market_summary with (security_invoker = true) as
+select
+  m.id, m.creator_id, m.room_id, m.event_id, m.template_id,
+  m.question, m.description, m.category, m.pool_yes, m.pool_no,
+  m.closes_at, m.resolved_outcome, m.resolved_at, m.created_at,
+  p.username as creator_username, p.avatar_emoji as creator_emoji, p.avatar_url as creator_avatar_url,
+  coalesce(b.volume, 0) as volume, coalesce(b.bet_count, 0) as bet_count
+from public.markets m
+join public.profiles p on p.id = m.creator_id
+left join (
+  select market_id, sum(amount) as volume, count(*) as bet_count
+  from public.bets group by market_id
+) b on b.market_id = m.id;
+grant select on public.market_summary to anon, authenticated;
+
+-- seed_event — materialise an event's templates into a room (idempotent).
+create or replace function public.seed_event(p_event_id uuid, p_room_id uuid)
+returns int language plpgsql security definer set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid(); v_house uuid; v_closes timestamptz; v_count int := 0; t record;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  if not exists (select 1 from public.room_members where room_id = p_room_id and user_id = v_user) then
+    raise exception 'not a member of this room';
+  end if;
+  select id into v_house from public.profiles where username = 'The Bookie';
+  if v_house is null then raise exception 'house profile missing'; end if;
+  select closes_at into v_closes from public.events where id = p_event_id;
+  if v_closes is null then raise exception 'event not found'; end if;
+  for t in select * from public.event_market_templates where event_id = p_event_id order by sort_order loop
+    insert into public.markets
+      (creator_id, room_id, event_id, template_id, question, description, category, pool_yes, pool_no, closes_at, resolution_rule)
+    values
+      (v_house, p_room_id, p_event_id, t.id, t.question, t.description, t.category, t.seed_yes, t.seed_no, v_closes, t.resolution_rule)
+    on conflict (room_id, template_id) where template_id is not null do nothing;
+    if found then v_count := v_count + 1; end if;
+  end loop;
+  return v_count;
+end;
+$$;
+revoke execute on function public.seed_event(uuid, uuid) from public, anon;
+grant execute on function public.seed_event(uuid, uuid) to authenticated;
+
+-- admin_settle_market — the auto-resolver's settlement path. Same maths as
+-- resolve_market but no creator/host check; service_role only. No-ops if the
+-- market was already settled (e.g. a host manual override got there first).
+create or replace function public.admin_settle_market(p_market_id uuid, p_outcome text)
+returns void language plpgsql security definer set search_path = public
+as $$
+declare v_resolved timestamptz; v_room uuid; r record; v_refund numeric;
+begin
+  if p_outcome not in ('YES','NO','VOID') then raise exception 'outcome must be YES, NO or VOID'; end if;
+  select resolved_at, room_id into v_resolved, v_room from public.markets where id = p_market_id for update;
+  if v_room is null then raise exception 'market not found'; end if;
+  if v_resolved is not null then return; end if;
+  if p_outcome = 'VOID' then
+    for r in select id, user_id, amount, shares, shares_open from public.bets where market_id = p_market_id loop
+      v_refund := case when r.shares > 0 then r.amount * (r.shares_open / r.shares) else 0 end;
+      if v_refund > 0 then
+        update public.room_members set balance = balance + v_refund where room_id = v_room and user_id = r.user_id;
+        insert into public.transactions (user_id, type, amount, market_id, room_id)
+        values (r.user_id, 'refund', v_refund, p_market_id, v_room);
+      end if;
+      update public.bets set payout = v_refund where id = r.id;
+    end loop;
+  else
+    for r in select id, user_id, side, shares_open from public.bets where market_id = p_market_id loop
+      if r.side = p_outcome and r.shares_open > 0 then
+        update public.room_members set balance = balance + r.shares_open where room_id = v_room and user_id = r.user_id;
+        update public.bets set payout = r.shares_open where id = r.id;
+        insert into public.transactions (user_id, type, amount, market_id, room_id)
+        values (r.user_id, 'payout', r.shares_open, p_market_id, v_room);
+      else
+        update public.bets set payout = 0 where id = r.id;
+      end if;
+    end loop;
+  end if;
+  update public.markets set resolved_outcome = p_outcome, resolved_at = now() where id = p_market_id;
+end;
+$$;
+revoke execute on function public.admin_settle_market(uuid, text) from public, anon, authenticated;
+grant execute on function public.admin_settle_market(uuid, text) to service_role;
+
+-- Auto-resolution scheduling: pg_cron fires net.http_post to the resolve-events
+-- edge function during the match window. See migration schedule_event_resolver.
+-- The function needs the APIFOOTBALL_KEY secret set on the project.
+
+-- ---- Odds seeding (real starting prices) ----------------------------------
+-- Starting prices come from The Odds API (the-odds-api.com) via the `seed-odds`
+-- edge function, which reads pre-match bookmaker odds and reseeds each market's
+-- pools to the implied probability — only for markets with no bets yet, via
+-- admin_seed_market_odds. Needs the ODDS_API_KEY secret. events.odds_sport_key
+-- tells it which sport feed to query (e.g. 'soccer_fifa_world_cup').
+alter table public.events add column if not exists odds_sport_key text;
+
+create or replace function public.admin_seed_market_odds(
+  p_market_id uuid, p_prob numeric, p_liquidity numeric default 600
+)
+returns boolean language plpgsql security definer set search_path = public
+as $$
+declare v_resolved timestamptz; v_has_bets boolean; p numeric;
+begin
+  select resolved_at into v_resolved from public.markets where id = p_market_id;
+  if v_resolved is not null then return false; end if;
+  select exists(select 1 from public.bets where market_id = p_market_id) into v_has_bets;
+  if v_has_bets then return false; end if;
+  p := least(0.95, greatest(0.05, p_prob));
+  update public.markets set pool_yes = (1 - p) * p_liquidity, pool_no = p * p_liquidity
+    where id = p_market_id;
+  return true;
+end;
+$$;
+revoke execute on function public.admin_seed_market_odds(uuid, numeric, numeric) from public, anon, authenticated;
+grant execute on function public.admin_seed_market_odds(uuid, numeric, numeric) to service_role;
+
+
+-- ============================================================================
+-- Room host controls — picture, rename, kick, delete.
+-- (Applied live as migration room_host_controls.) Room pictures reuse the
+-- avatars bucket under the host's own id folder, so no new storage policy.
+-- ============================================================================
+alter table public.rooms add column if not exists avatar_url text;
+
+create or replace function public.update_room(
+  p_room_id uuid, p_name text default null, p_avatar_url text default null
+)
+returns void language plpgsql security definer set search_path = public
+as $$
+declare v_user uuid := auth.uid(); v_host uuid;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  select host_id into v_host from public.rooms where id = p_room_id;
+  if v_host is null then raise exception 'room not found'; end if;
+  if v_host <> v_user then raise exception 'only the host can edit this room'; end if;
+  if p_name is not null then
+    if char_length(trim(p_name)) < 3 or char_length(trim(p_name)) > 40 then
+      raise exception 'room name must be 3-40 characters';
+    end if;
+    update public.rooms set name = trim(p_name) where id = p_room_id;
+  end if;
+  if p_avatar_url is not null then
+    update public.rooms set avatar_url = nullif(p_avatar_url, '') where id = p_room_id;
+  end if;
+end;
+$$;
+
+create or replace function public.kick_member(p_room_id uuid, p_user_id uuid)
+returns void language plpgsql security definer set search_path = public
+as $$
+declare v_user uuid := auth.uid(); v_host uuid;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  select host_id into v_host from public.rooms where id = p_room_id;
+  if v_host is null then raise exception 'room not found'; end if;
+  if v_host <> v_user then raise exception 'only the host can remove players'; end if;
+  if p_user_id = v_host then raise exception 'the host cannot be removed'; end if;
+  delete from public.room_members where room_id = p_room_id and user_id = p_user_id;
+end;
+$$;
+
+-- markets/transactions FKs to rooms are NO ACTION, so clear them first.
+create or replace function public.delete_room(p_room_id uuid)
+returns void language plpgsql security definer set search_path = public
+as $$
+declare v_user uuid := auth.uid(); v_host uuid;
+begin
+  if v_user is null then raise exception 'not authenticated'; end if;
+  select host_id into v_host from public.rooms where id = p_room_id;
+  if v_host is null then raise exception 'room not found'; end if;
+  if v_host <> v_user then raise exception 'only the host can delete this room'; end if;
+  delete from public.transactions where room_id = p_room_id;
+  delete from public.markets where room_id = p_room_id;
+  delete from public.rooms where id = p_room_id;
+end;
+$$;
+
+revoke execute on function public.update_room(uuid, text, text) from public, anon;
+revoke execute on function public.kick_member(uuid, uuid) from public, anon;
+revoke execute on function public.delete_room(uuid) from public, anon;
+grant execute on function public.update_room(uuid, text, text) to authenticated;
+grant execute on function public.kick_member(uuid, uuid) to authenticated;
+grant execute on function public.delete_room(uuid) to authenticated;

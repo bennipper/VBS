@@ -203,6 +203,10 @@ export default function MarketDetail() {
           </span>
         </div>
 
+        {market.event_id && (
+          <div className="house-note">🎩 House market · auto-settles from the full-time result</div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16 }}>
           <ProbNumber prob={prob} size="xl" label={isResolved ? 'final YES' : 'YES chance'} />
           <div className="stack" style={{ gap: 6 }}>
@@ -312,10 +316,12 @@ export default function MarketDetail() {
       {/* Resolve panel — creator only */}
       {canResolve && !isResolved && (
         <>
-          <div className="section-head"><h2>Resolve · your market</h2></div>
+          <div className="section-head"><h2>Resolve · {market.event_id ? 'house market' : 'your market'}</h2></div>
           <div className="card stack">
             <p className="faint" style={{ margin: 0, fontSize: 13 }}>
-              You opened it, you call it. Pays out immediately and can't be undone.
+              {market.event_id
+                ? 'This normally auto-settles from the match result — this is your manual override if the feed is delayed or wrong. Pays out immediately and can’t be undone.'
+                : 'You opened it, you call it. Pays out immediately and can’t be undone.'}
             </p>
             {resolveError && <div className="error-box">{resolveError}</div>}
             {confirmOutcome ? (
