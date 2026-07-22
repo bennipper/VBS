@@ -5,6 +5,7 @@ import { useRoom } from '../context/RoomContext.jsx'
 import TickerRow from '../components/TickerRow.jsx'
 import Sparkline from '../components/Sparkline.jsx'
 import ChangePill from '../components/ChangePill.jsx'
+import StockTicker from '../components/StockTicker.jsx'
 import { priceStr, pctChange } from '../lib/exchange.js'
 import { INDEX_LABEL } from '../config.js'
 
@@ -102,6 +103,9 @@ export default function Exchange() {
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => navigate('/ticker/new')}>+ List</button>
       </div>
+
+      {/* Scrolling ticker tape */}
+      <StockTicker tickers={tickers} />
 
       {/* Biggest mover */}
       {mover && (
