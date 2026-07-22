@@ -162,7 +162,6 @@ export default function TickerDetail() {
       {/* Hero */}
       <div className="ticker-hero">
         <div className="th-top">
-          <span className="tk-emoji" style={{ fontSize: 26 }}>{ticker.emoji}</span>
           <div>
             <div className="th-sym">
               {ticker.symbol}

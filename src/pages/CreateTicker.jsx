@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useRoom } from '../context/RoomContext.jsx'
 import Avatar from '../components/Avatar.jsx'
-import { TICKER_TYPES, TICKER_EMOJIS } from '../config.js'
+import { TICKER_TYPES } from '../config.js'
 
 // Symbol suggestion: uppercase alnum, strip vowels if it won't fit in 5.
 function suggestSymbol(name) {
@@ -23,7 +23,6 @@ export default function CreateTicker() {
   const [name, setName] = useState('')
   const [symbol, setSymbol] = useState('')
   const [symbolEdited, setSymbolEdited] = useState(false)
-  const [emoji, setEmoji] = useState('🧑')
   const [subjectId, setSubjectId] = useState('')
   const [members, setMembers] = useState([])
   const [busy, setBusy] = useState(false)
@@ -47,9 +46,7 @@ export default function CreateTicker() {
   function pickType(k) {
     setType(k)
     setErr('')
-    const meta = TICKER_TYPES.find((t) => t.key === k)
-    if (meta) setEmoji(meta.emoji)
-    if (k !== 'member') { setSubjectId(''); }
+    if (k !== 'member') { setSubjectId('') }
   }
 
   function pickMember(uid) {
@@ -74,7 +71,6 @@ export default function CreateTicker() {
       p_symbol: sym,
       p_name: name.trim(),
       p_type: type,
-      p_emoji: emoji,
       p_subject_user_id: type === 'member' ? subjectId : null,
     })
     setBusy(false)
@@ -155,29 +151,18 @@ export default function CreateTicker() {
           )}
         </div>
 
-        {/* Symbol + emoji */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div className="field" style={{ margin: 0, flex: 1 }}>
-            <label>Symbol</label>
-            <input
-              className="input tnum"
-              value={symbol}
-              maxLength={5}
-              onChange={(e) => { setSymbol(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setSymbolEdited(true) }}
-              placeholder="FRDG"
-              style={{ letterSpacing: '0.15em', fontWeight: 700 }}
-            />
-            <div className="hint">2–5 chars · locked after listing</div>
-          </div>
-          <div className="field" style={{ margin: 0 }}>
-            <label>Emoji</label>
-            <div className="emoji-mini">{emoji}</div>
-          </div>
-        </div>
-        <div className="emoji-row">
-          {TICKER_EMOJIS.map((e) => (
-            <button type="button" key={e} className={`emoji-opt${emoji === e ? ' sel' : ''}`} onClick={() => setEmoji(e)}>{e}</button>
-          ))}
+        {/* Symbol */}
+        <div className="field" style={{ margin: 0 }}>
+          <label>Symbol</label>
+          <input
+            className="input tnum"
+            value={symbol}
+            maxLength={5}
+            onChange={(e) => { setSymbol(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setSymbolEdited(true) }}
+            placeholder="FRDG"
+            style={{ letterSpacing: '0.15em', fontWeight: 700 }}
+          />
+          <div className="hint">2–5 chars · locked after listing</div>
         </div>
 
         <div className="note-box" style={{ fontSize: 12.5 }}>

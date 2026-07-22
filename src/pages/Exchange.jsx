@@ -6,14 +6,13 @@ import TickerRow from '../components/TickerRow.jsx'
 import Sparkline from '../components/Sparkline.jsx'
 import ChangePill from '../components/ChangePill.jsx'
 import { priceStr, pctChange } from '../lib/exchange.js'
-import { TICKER_FILTERS, INDEX_LABEL } from '../config.js'
+import { INDEX_LABEL } from '../config.js'
 
 export default function Exchange() {
   const { activeRoomId, activeRoom, rooms, loading: roomsLoading } = useRoom()
   const navigate = useNavigate()
   const [tickers, setTickers] = useState([])
   const [events, setEvents] = useState([]) // today's vote events, chronological
-  const [filter, setFilter] = useState('All')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -56,12 +55,6 @@ export default function Exchange() {
     for (const t of tickers) m[t.id] = t.halted_until && new Date(t.halted_until).getTime() > now
     return m
   }, [tickers])
-
-  const shown = useMemo(() => {
-    const f = TICKER_FILTERS.find((x) => x.key === filter)
-    if (!f || !f.types) return tickers
-    return tickers.filter((t) => f.types.includes(t.type))
-  }, [tickers, filter])
 
   // The Index: mean price, and an intraday mean series replayed from events.
   const index = useMemo(() => {
@@ -115,7 +108,7 @@ export default function Exchange() {
         <div className="mover-card" onClick={() => navigate(`/ticker/${mover.t.id}`)} role="button">
           <span className="mover-label">Biggest mover today</span>
           <span className="mover-body">
-            <span className="tk-emoji">{mover.t.emoji}</span> <b>{mover.t.symbol}</b>
+            <b>{mover.t.symbol}</b>
             <span className="tk-name"> {mover.t.name}</span>
           </span>
           <ChangePill from={mover.t.session_open} to={mover.t.price} />

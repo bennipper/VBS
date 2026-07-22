@@ -15,7 +15,6 @@ export default function TickerRow({ ticker, series, halted, onClick }) {
     <div className="tk-row" role="button" onClick={go}>
       <div className="tk-id">
         <div className="tk-sym">
-          <span className="tk-emoji">{ticker.emoji}</span>
           {ticker.symbol}
           {halted && <span className="tk-halted">HALTED</span>}
         </div>
