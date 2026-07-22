@@ -49,7 +49,7 @@ export default function Layout({ children }) {
           <NavItem to="/" ico={<Icon name="market" />} label="Markets" end />
           <NavItem to="/leaderboard" ico={<Icon name="table" />} label="Table" />
           <NavItem to="/create" ico={<Icon name="plus" />} label="New" />
-          <NavItem to="/rooms" ico={<Icon name="rooms" />} label="Rooms" />
+          <NavItem to="/exchange" ico={<Icon name="exchange" />} label="Exchange" />
           <NavItem to="/me" ico={<Icon name="you" />} label="You" />
         </div>
       </nav>

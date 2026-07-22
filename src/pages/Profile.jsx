@@ -6,6 +6,7 @@ import { useRoom } from '../context/RoomContext.jsx'
 import { money, signedMoney, priceLabel, relTime } from '../lib/format.js'
 import { BAILOUT_THRESHOLD, BAILOUT_AMOUNT, AVATAR_BUCKET, AVATAR_MAX_BYTES } from '../config.js'
 import Avatar from '../components/Avatar.jsx'
+import RoomsSection from '../components/RoomsSection.jsx'
 import { computeAchievements } from '../lib/achievements.js'
 
 // Net P/L from the ledger — includes payouts, refunds, cash-outs and rake, minus
@@ -251,6 +252,9 @@ export default function Profile() {
           </p>
         )}
       </div>
+
+      {/* Rooms live in the account now */}
+      {isMe && <RoomsSection />}
 
       {/* Stats */}
       <div className="section-head"><h2>Stats</h2></div>

@@ -75,3 +75,36 @@ export const TEAM_FLAGS = {
 export function teamFlag(name) {
   return TEAM_FLAGS[name] || '🏳️'
 }
+
+// ---------------------------------------------------------------------------
+// The Exchange — vote-driven tickers. Keep in sync with supabase/exchange.sql.
+// ---------------------------------------------------------------------------
+export const VOTE_BUDGET = 10          // vote units per user per room per day
+export const MAX_MAGNITUDE = 6         // max units on a single vote
+export const REASON_MIN_MAGNITUDE = 3  // reason required at/above this magnitude
+export const REASON_MAX_CHARS = 140
+export const HALT_DROP = 0.15          // circuit breaker: −15% from the 04:00 open
+export const INDEX_LABEL = 'THE INDEX' // pinned mean-of-all-tickers row
+
+export const TICKER_TYPES = [
+  { key: 'member', label: 'Member', emoji: '🧑', hint: 'A mate in this room' },
+  { key: 'person', label: 'Person', emoji: '🕵️', hint: 'Not a member — use a nickname, not a real name' },
+  { key: 'thing', label: 'Thing', emoji: '📦', hint: 'The office fridge, the printer…' },
+  { key: 'concept', label: 'Concept', emoji: '💭', hint: 'Monday, the weather, AI…' },
+]
+
+// Filter chips on the Exchange list.
+export const TICKER_FILTERS = [
+  { key: 'All', label: 'All', types: null },
+  { key: 'People', label: 'People', types: ['member', 'person'] },
+  { key: 'Things', label: 'Things', types: ['thing'] },
+  { key: 'Concepts', label: 'Concepts', types: ['concept'] },
+]
+
+// Time ranges on charts. 1D reads live from ticker_events; the rest from daily_closes.
+export const TIME_RANGES = ['1D', '1W', '1M', '3M', 'YTD', '1Y']
+
+export const TICKER_EMOJIS = [
+  '📈', '📉', '🧑', '🕵️', '📦', '💭', '🖨️', '🧊', '🔥', '💀',
+  '👑', '🤡', '🐍', '⚡', '🎯', '🧨', '🥴', '🚽', '☕', '🌧️',
+]

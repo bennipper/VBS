@@ -9,9 +9,11 @@ import MarketDetail from './pages/MarketDetail.jsx'
 import CreateMarket from './pages/CreateMarket.jsx'
 import Profile from './pages/Profile.jsx'
 import Leaderboard from './pages/Leaderboard.jsx'
-import Rooms from './pages/Rooms.jsx'
 import JoinRoom from './pages/JoinRoom.jsx'
 import EventPage from './pages/EventPage.jsx'
+import Exchange from './pages/Exchange.jsx'
+import TickerDetail from './pages/TickerDetail.jsx'
+import CreateTicker from './pages/CreateTicker.jsx'
 import NotConfigured from './components/NotConfigured.jsx'
 
 export default function App() {
@@ -48,12 +50,15 @@ export default function App() {
           <Route path="/market/:id" element={<MarketDetail />} />
           <Route path="/create" element={<CreateMarket />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="/rooms" element={<Rooms />} />
+          <Route path="/exchange" element={<Exchange />} />
+          <Route path="/ticker/new" element={<CreateTicker />} />
+          <Route path="/ticker/:id" element={<TickerDetail />} />
+          <Route path="/rooms" element={<Navigate to="/me" replace />} />
           <Route path="/join/:code" element={<JoinRoom />} />
           <Route path="/me" element={<Profile />} />
           <Route path="/u/:id" element={<Profile />} />
-          <Route path="/daily" element={<Navigate to="/rooms" replace />} />
-          <Route path="/casino" element={<Navigate to="/rooms" replace />} />
+          <Route path="/daily" element={<Navigate to="/me" replace />} />
+          <Route path="/casino" element={<Navigate to="/me" replace />} />
           <Route path="/auth" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

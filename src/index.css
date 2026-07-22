@@ -617,6 +617,87 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 /* Chart */
 .chart-wrap { position: relative; }
 
+/* ==========================================================================
+   The Exchange — Apple Stocks structure, TightPunt skin.
+   Up/down colour appears ONLY on price change (these two tokens); pink stays
+   interactive-only. Everything numeric is tabular.
+   ========================================================================== */
+:root { --price-up: var(--green); --price-down: var(--red); }
+.up { color: var(--price-up); }
+.down { color: var(--price-down); }
+
+.exchange-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 2px 8px; }
+.exchange-title { font-family: var(--font-num); font-weight: 800; font-size: 30px; letter-spacing: -0.02em; }
+.exchange-sub { font-size: 12.5px; color: var(--paper-dim); margin-top: 2px; font-weight: 600; }
+
+.mover-card {
+  display: flex; align-items: center; gap: 10px; padding: 11px 13px; margin: 6px 0 12px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--ink-2);
+}
+.mover-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--paper-faint); font-weight: 700; }
+.mover-body { flex: 1; font-size: 14px; }
+.mover-body .tk-name { color: var(--paper-dim); font-size: 13px; }
+
+/* One card of flat rows */
+.tk-card { padding: 4px 14px; }
+.tk-row {
+  display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 0;
+  border-bottom: 1px solid var(--line); cursor: pointer;
+}
+.tk-row:last-child { border-bottom: none; }
+.tk-id { flex: 1 1 40%; min-width: 0; }
+.tk-sym { display: flex; align-items: center; gap: 6px; font-family: var(--font-num); font-weight: 700; font-size: 17px; }
+.tk-emoji { font-size: 16px; }
+.tk-name { color: var(--paper-dim); font-size: 13px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-spark { flex: 0 0 72px; display: flex; align-items: center; justify-content: center; }
+.tk-right { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 92px; }
+.tk-price { font-family: var(--font-num); font-weight: 600; font-size: 17px; }
+.change-pill { min-width: 78px; justify-content: center; }
+.tk-halted, .tk-name .tk-halted { font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 45%, transparent); padding: 1px 5px; border-radius: 4px; }
+.tk-index { border-bottom: 2px solid var(--line-2); }
+.tk-index .tk-sym { color: var(--paper); letter-spacing: 0.06em; }
+
+/* Detail hero */
+.ticker-hero { margin-top: 10px; }
+.th-top { display: flex; align-items: center; gap: 12px; }
+.th-sym { display: flex; align-items: center; gap: 8px; font-family: var(--font-num); font-weight: 700; font-size: 22px; }
+.th-name { color: var(--paper-dim); font-size: 13.5px; margin-top: 1px; }
+.th-price-row { display: flex; align-items: baseline; gap: 14px; margin-top: 12px; cursor: pointer; }
+.th-price { font-family: var(--font-num); font-weight: 800; font-size: 46px; letter-spacing: -0.02em; line-height: 1; }
+.range-tabs { margin: 10px 0 4px; }
+.range-tabs .tab { flex: 1; text-align: center; }
+
+/* Vote widget */
+.vote-widget { display: flex; flex-direction: column; gap: 12px; }
+.vote-controls { display: flex; align-items: center; gap: 16px; justify-content: center; }
+.vote-arrow {
+  width: 60px; height: 60px; border-radius: 50%; border: 1.5px solid var(--line-2);
+  font-size: 22px; color: var(--paper-dim); background: var(--ink-2);
+  display: flex; align-items: center; justify-content: center; transition: transform 0.05s ease;
+}
+.vote-arrow:active { transform: scale(0.92); }
+.vote-arrow.up.on { border-color: var(--price-up); color: var(--price-up); background: var(--green-ink); }
+.vote-arrow.down.on { border-color: var(--price-down); color: var(--price-down); background: var(--red-ink); }
+.vote-arrow:disabled { opacity: 0.4; }
+.vote-mag { flex: 1; text-align: center; min-width: 0; }
+.vote-count { font-family: var(--font-num); font-weight: 800; font-size: 40px; line-height: 1; }
+.vote-count.up { color: var(--price-up); } .vote-count.down { color: var(--price-down); }
+.vote-preview { font-size: 12.5px; color: var(--paper-dim); margin-top: 4px; }
+.vote-budget { text-align: center; font-size: 12px; }
+
+/* Member picker + emoji picker (create ticker) */
+.member-pick { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 9px 11px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--ink-2); font-size: 14px; }
+.member-pick.sel { border-color: var(--brand); color: #fff; }
+.emoji-mini { width: 48px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--ink-2); }
+.emoji-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.emoji-opt { font-size: 20px; padding: 5px; border-radius: 8px; border: 1px solid transparent; }
+.emoji-opt.sel { border-color: var(--brand); background: var(--brand-soft); }
+
+/* News feed */
+.news-row { align-items: flex-start; }
+.news-delta { font-weight: 800; font-family: var(--font-num); }
+.scrub-readout { position: absolute; top: 4px; left: 8px; font-size: 13px; z-index: 2; pointer-events: none; }
+
 /* ---- Event markets (house bets for major events) ------------------------- */
 
 /* Feed banner promoting the current event. Sits under the tabs, first of the list. */

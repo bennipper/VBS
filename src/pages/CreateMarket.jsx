@@ -58,8 +58,8 @@ export default function CreateMarket() {
       <div className="empty" style={{ paddingTop: 60 }}>
         <div className="big">🚪</div>
         <p>Markets live in rooms. Join or make one first.</p>
-        <Link to="/rooms" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
-          Go to rooms
+        <Link to="/me" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
+          Go to your account
         </Link>
       </div>
     )
