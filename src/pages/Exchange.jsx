@@ -119,15 +119,6 @@ export default function Exchange() {
         </div>
       )}
 
-      {/* Type filter chips */}
-      <div className="cat-scroll">
-        {TICKER_FILTERS.map((f) => (
-          <button key={f.key} className={`cat-chip${filter === f.key ? ' sel' : ''}`} onClick={() => setFilter(f.key)}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
       {loading ? (
         <div className="loading-full"><div className="spin" /></div>
       ) : tickers.length === 0 ? (
@@ -154,7 +145,7 @@ export default function Exchange() {
               </div>
             </div>
           )}
-          {shown.map((t) => (
+          {tickers.map((t) => (
             <TickerRow key={t.id} ticker={t} series={seriesByTicker[t.id]} halted={halted[t.id]} />
           ))}
         </div>
